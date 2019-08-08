@@ -1,0 +1,227 @@
+{% extends "baseLog.html" %}
+
+{% block content %}
+<script src="https://code.jquery.com/jquery-3.3.1.js"></script>
+
+
+    <script type="text/javaScript">
+        $(function() {
+          $(".option-heading").on('click', function() {
+  $(this).toggleClass('is-active').next(".option-content").stop().slideToggle(500);
+});
+        });
+    </script>
+
+    <style>
+    .option-heading:before           { content: "\25BA"; }
+    .option-heading.is-active:before { content: "\25BC"; }
+
+    /* Helpers */
+    .is-hidden { content: "\25BC"; display: none;
+
+    .btn {
+    display: inline-block;
+    margin: 0;
+    outline: 0 none;
+    padding: 0;
+    width: 0%;
+    box-sizing:border-box;
+}
+    </style>
+
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<div align="right"><b>{{title}}</b></div>
+
+<body>
+    <form action="{{ url_for('enter_data') }}" method="post">
+      {{ form.hidden_tag() }}
+      <h3> If you want to add or update data to the cichlid database, <p style="margin-left: 40px">      you can download a template
+            <label for="sel_temp" class="btn" style='font-size: 20px; font-style:italic; color: darkblue'>-here-</label>
+            <input type="submit" id="sel_temp" style='display:none;' name="Download">, fill it,
+            <label for="upfiles" class="btn" style='font-size: 20px; font-style:italic; color: darkblue'  >-point to the filled file-</label>
+            <input id="upfiles" type="file" name="Upload" style="display:none;">
+            then click {{ form.submit() }} to upload </p>
+      </h3>
+        <h3 style="margin-left: 40px" >or fill this form:</h3>
+
+    {{ form.Option.label }} {{ form.Option}}
+    <p></p>
+    <fieldset>
+      <legend><b> Individual</b> information</legend>
+
+      <div style = font-size:16px; font-weight:bold;>
+        <p>
+            {{ form.ind_name.label }}
+            {{ form.ind_name(size=32) }}<br>
+        </p>
+        <p>
+            {{ form.ind_alias.label }}
+            {{ form.ind_alias(size=32) }}<br>
+        </p>
+          {{ form.Gender.label }} {{ form.Gender }}
+          {{ form.dev_stage.label }} {{ form.dev_stage}}<br>
+      </div>
+
+    </fieldset>
+    <p></p>
+    <fieldset>
+      <div class="option-heading"><b> Species</b> information </div>
+      <div class="option-content is-hidden">
+      <div style = font-size:16px; font-weight:bold;>
+              <p>
+            {{ form.sp_name.label }}{{ form.sp_name(size=32) }}<br>
+          </p>
+          <p>{{ form.sp_cname.label }}{{ form.sp_cname(size=32) }}<br>
+          </p>
+          <p>{{ form.sp_taxid.label }}{{ form.sp_taxid(size=16) }}<br>
+          </p>
+          <p>  {{ form.sp_taxpos.label }} {{ form.sp_taxpos}}<br>
+        </p>
+      </div>
+    </div>
+    </fieldset>
+    <p></p>
+    <fieldset>
+      <div class="option-heading"><b> Provider</b> information </div>
+      <div class="option-content is-hidden">
+      <div style = font-size:16px; font-weight:bold;>
+      <p>
+      <select name= provname method="GET" action="/">
+        {% for prov in prov_list %}
+          <option value= "{{prov}}" SELECTED>{{prov}}</option>"
+        {% endfor %}
+      </select>
+      </p>
+      <p>
+      {{ form.pv_name.label }}{{ form.pv_name(size=32) }}<br>
+      </p>
+          <p>{{ form.pv_fname.label }}{{ form.pv_fname(size=32) }}<br>
+          </p>
+          <p>{{ form.pv_mail.label }}{{ form.pv_mail(size=32) }}<br>
+          </p>
+          <p>  {{ form.pv_phone.label }} {{ form.pv_phone(size=32)}}<br>
+        </p>
+        <p>  {{ form.pv_address.label }} {{ form.pv_address(size=40)}}<br>
+      </p>
+      </div>
+    </div>
+    </fieldset>
+        <p></p>
+    <fieldset>
+      <div class="option-heading"><b> Material</b> information </div>
+      <div class="option-content is-hidden">
+      <div style = font-size:16px; font-weight:bold;>
+        <p>
+          {{ form.mat_name.label }}{{ form.mat_name(size=32) }}<br>
+        </p>
+        <p>
+          {{ form.mat_acc.label }}{{ form.mat_acc(size=32) }}<br>
+        </p>
+        <p>
+          {{ form.mat_type.label }}{{ form.mat_type}}<br>
+        </p>
+        <p>
+            {{ form.mat_part.label }}{{ form.mat_part}}<br>
+          </p>
+          <p>
+              {{ form.mat_cond.label }}{{ form.mat_cond}}<br>
+            </p>
+        </p>
+        <p>
+            {{ form.mat_location.label }}{{ form.mat_location}}
+            {{ form.mat_loc_pos.label }}{{ form.mat_loc_pos}}<br>
+          </p>
+        <p>
+          {{ form.mat_wgt.label }}{{ form.mat_wgt(size=10) }}{{ form.mat_unit.label }}{{ form.mat_unit}}<br>
+        </p>
+        <p>{{ form.mat_received.label }}{{ form.mat_received(size=16) }}<br>
+        </p>
+
+      </div>
+    </div>
+    </fieldset>
+    <p></p>
+    <fieldset>
+      <div class="option-heading"><b> Collection</b> information </div>
+      <div class="option-content is-hidden">
+      <div style = font-size:16px; font-weight:bold;>
+        <p>
+          {{ form.loc_region.label }}{{ form.loc_region(size=32) }}<br>
+        </p>
+        <p>
+          {{ form.loc_details.label }}{{ form.loc_details(size=32) }}<br>
+        </p>
+        <p>
+          {{ form.loc_lat.label }}{{ form.loc_lat(size=10) }}<br>
+        </p>
+        <p>
+          {{ form.loc_lng.label }}{{ form.loc_lng(size=10) }}<br>
+        </p>
+        <p>
+          {{ form.loc_method.label }}{{ form.loc_method(size=32) }}<br>
+        </p>
+    <p>{{ form.loc_collected.label }}{{ form.loc_collected(size=16) }}<br>
+    </p>
+  </div>
+        </fieldset>
+        <p></p>
+        <fieldset>
+          <div class="option-heading"><b> Project</b> information </div>
+          <div class="option-content is-hidden">
+          <div style = font-size:16px; font-weight:bold;>
+            <p>
+              {{ form.prj_name.label }}{{ form.prj_name(size=32) }}<br>
+            </p>
+            <p>
+              {{ form.prj_alias.label }}{{ form.prj_alias(size=32) }}<br>
+            </p>
+            <p>
+              {{ form.prj_acc.label }}{{ form.prj_acc(size=16) }}<br>
+            </p>
+            <p>
+              {{ form.prj_ssid.label }}{{ form.prj_ssid(size=10) }}<br>
+            </p>
+          </fieldset>
+        <p></p>
+        <fieldset>
+          <div class="option-heading"><b> Image</b> information </div>
+          <div class="option-content is-hidden">
+          <div style = font-size:16px; font-weight:bold;>
+            <p>
+              {{ form.img_name.label }}{{ form.img_name(size=32) }}<br>
+            </p>
+            <p>
+              {{ form.img_source.label }}{{ form.img_source(size=32) }}<br>
+            </p>
+            <p>
+              {{ form.img_comments.label }}{{ form.img_comments(size=32) }}<br>
+            </p>
+      </div>
+    </fieldset>
+    <p></p>
+    <fieldset>
+      <div class="option-heading"><b> Other annotations</b> </div>
+      <div class="option-content is-hidden">
+      <div style = font-size:16px; font-weight:bold;>
+        <p>
+          {{ form.ann_ann.label }}{{ form.ann_ann(size=32) }}<br>
+        </p>
+        <p>
+          {{ form.ann_comments.label }}{{ form.ann_comments(size=32) }}<br>
+        </p>
+        <p>
+          {{ form.ann_cat.label }}{{ form.ann_cat}}<br>
+        </p>
+      </div>
+      </fieldset>
+      <p></p>
+      <center>
+         {{ form.submit() }}
+       </center>
+
+    </form>
+      </body>
+
+{% endblock %}

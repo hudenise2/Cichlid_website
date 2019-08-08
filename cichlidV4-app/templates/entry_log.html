@@ -1,0 +1,132 @@
+{% extends "baseLog.html" %}
+
+{% block content %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+div.a {
+  margin-left: 10px;
+}
+</style>
+
+<style>
+.dropbtn {
+  background-color: #717D7E;
+  color: white;
+  padding: 16px;
+  font-size: 20px;
+  border: none;
+  cursor: pointer;
+}
+
+.dropbtn:hover, .dropbtn:focus {
+  background-color: #2980B9;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #AED6F1;
+  min-width: 160px;
+  overflow: auto;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+}
+
+.dropdown-content a {
+  color: black;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+}
+
+.dropdown a:hover {background-color: #ddd;}
+
+.show {display: block;}
+</style>
+
+<body>
+  <div class="a">
+<div class="dropdown" name='dropdown'>
+  <button onclick="myFunction()" class="dropbtn">Select a table</button>
+  <div id="myDropdown" class="dropdown-content">
+    <a href="{{ url_for('get_projects') }}">Project</a>
+    <a href="{{ url_for('get_individuals') }}">Individual</a>
+    <a href="{{ url_for('get_species') }}">Species</a>
+    <a href="{{ url_for('get_samples') }}">Samples</a>
+    <a href="{{ url_for('get_images') }}">Images</a>
+    <a href="{{ url_for('get_location') }}">Location</a>
+    <a href="{{ url_for('get_material') }}">Material</a>
+    <a href="{{ url_for('get_lanes') }}">Lane</a>
+  </div>
+</div>
+
+  <p></p>
+    <p></p>
+
+    <h3>Or enter your criterias: </h3>
+    <form action="" method="post" novalidate autocomplete="off">
+      {{ form.csrf }}
+        {{ form.hidden_tag() }}
+          <p>
+            <select name= proj_choice method="GET" action="/" >
+              {% for proj in project_list %}
+                <option value= "{{proj}}" SELECTED>{{proj}}</option>"
+              {% endfor %}
+            </select>
+          </p>
+        <p>
+            {{ form.name.label }}<br>
+            {{ form.name(size=32) }}<br>
+            {% for error in form.name.errors %}
+            <span style="color: red;">[{{ error }}]</span>
+            {% endfor %}
+        </p>
+        <p>
+            {{ form.spname.label }}<br>
+            {{ form.spname(size=32) }}<br>
+            {% for error in form.spname.errors %}
+            <span style="color: red;">[{{ error }}]</span>
+            {% endfor %}
+        </p>
+        <br>
+        <p>
+          <select name= loc_choice method="GET" action="/" >
+            {% for loc_r in loc_list %}
+              <option value= "{{loc_r}}" SELECTED>{{loc_r}}</option>"
+            {% endfor %}
+          </select>
+        </p>
+        <br>
+        <p style="margin-left: 10px">{{ form.submit() }}</p>
+      </div>
+    </body>
+
+    <script>
+    /* When the user clicks on the button,
+    toggle between hiding and showing the dropdown content */
+    function myFunction() {
+      document.getElementById("myDropdown").classList.toggle("show");
+    }
+
+    // Close the dropdown if the user clicks outside of it
+    window.onclick = function(event) {
+      if (!event.target.matches('.dropbtn')) {
+        var dropdowns = document.getElementsByClassName("dropdown-content");
+        var i;
+        for (i = 0; i < dropdowns.length; i++) {
+          var openDropdown = dropdowns[i];
+          if (openDropdown.classList.contains('show')) {
+            openDropdown.classList.remove('show');
+          }
+        }
+      }
+    }
+    </script>
+
+    </form>
+{% endblock %}

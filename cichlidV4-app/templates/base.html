@@ -1,0 +1,27 @@
+<html>
+    <head>
+      <title>Welcome to the Cichlid database</title>
+      <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" media="screen">
+    </head>
+    <body>
+        <div>
+          <h1 style="text-align:center;"> CICHLID DATABASE:
+            <a href="{{ url_for('index') }}">Home</a>
+          </h1>
+          <p style="text-align:right;font-size:150%;margin: 20px;">
+            <a href="{{ url_for('login') }}">Login</a>
+          </p>
+        </div>
+       <hr>
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <ul>
+              {% for message in messages %}
+                <li>{{ message }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+      {% block content %}{% endblock %}
+    </body>
+</html>

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <head>
+    <title>TablesPage</title>
+    <!--link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous"-->
+    <!--script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script-->
+    <!--script type="text/javascript" charset="utf8" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script-->
+    <!--script type="text/javascript" charset="utf8" src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script-->
+
+    <link rel="stylesheet" href="/static/jquery.dataTables.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.5.6/css/buttons.dataTables.min.css">
+
+    <!--script type="text/javascript" charset="utf8" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"> </script-->
+    <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.3.1.js"> </script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.min.js"> </script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.5.6/js/buttons.colVis.min.js"> </script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.5.6/js/dataTables.buttons.min.js"> </script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.5.6/js/buttons.html5.min.js"> </script>
+    <!--script type="text/javascript" charset="utf8" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script-->
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.5.6/js/buttons.flash.min.js"></script>
+    <!--script type="text/javascript" charset="utf8" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script-->
+<style>
+
+	.TFtable{
+			border-collapse:collapse;
+	}
+	.TFtable td, th{
+		border:#4e95f4 1px solid;
+	}
+	/* provide some minimal visual accomodation for IE8 and below */
+	.TFtable tr{
+		background: #b8d1f3;
+	}
+  /*  Define the colour for the header row  */
+	.TFtable th{
+		background: #77A7E8;
+	}
+	/*  Define the background color for all the ODD background rows  */
+	.TFtable tr:odd{
+		background: #f1f1f1;
+	}
+	/*  Define the background color for all the EVEN background rows  */
+	.TFtable tr:nth-child(even){
+		background: #f1f1f1;
+	}
+</style>
+
+
+</head>
+  <p style="text-indent: 50px;"> <b>{{title}}</b></style></p>
+  <p> {{url_param}} </p>
+ <body>
+   <table class="TFtable" id="TFtable" >
+     <tbody>
+       {% for row in results %}
+          {% for data in row[:-1] %}
+            {% if data[0] in view_param %}
+              <td style="color:#f1f1f1"></td>
+            {% endif %}
+            <tr><th>{{data[0]}}</th>
+            {% for entry in data[1:] %}
+              <td>{{entry}}</td>
+            {% endfor %}
+            </tr>
+         {% endfor %}
+         {% if row[-1][0] == 'thumbnail' %}
+         <td style="color:#f1f1f1"></td>
+         {% endif %}
+          <tr><th>{{row[-1][0]}}</th>
+          {% for entry in row[-1][1:] %}
+          <td>
+            {% if row[-1][0] == 'thumbnail' %}
+              {% if entry[:4] == 'http' %}
+                <a target="_blank" href={{entry}}>
+                <img src={{entry}} style="width:200px">
+              {% else %}
+                {{""}}
+              {% endif %}
+            {% else %}
+              {{entry}}
+            {% endif %}
+        </td>
+            {% endfor %}
+     {% endfor %}
+   </tbody>
+   </table>
+ </body>
+
+   <script>
+   var tt = '{{ title }}'.substring(11,);
+   $(document).ready(function() {
+     $('#TFtable').DataTable( {
+       dom: 'Bfrtip',
+       'sScrollY': '400px',
+       'sScrollX': '100%',
+       buttons: [
+         {extend: 'colvis', postfixButtons: ['colvisRestore'], text: 'add/remove columns'},
+         {extend: 'csvHtml5', text: 'Save current page (TSV)',
+             exportOptions: { modifier: {
+               fieldSeparator: '\t',
+               extension: '.tsv',
+               page: 'current'}}},
+          {extend: 'excel', text: 'Save current page (excel)',
+               exportOptions: { modifier: {
+                 fieldSeparator: '\t',
+                 page: 'current'}}},
+          {extend: 'pdf', text: 'Save current page (pdf)',
+                exportOptions: { modifier: {
+                  page: 'current'}}}
+     ],
+
+   } )
+ } );
+</script>
+
+ {% endblock %}
