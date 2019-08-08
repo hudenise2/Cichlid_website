@@ -904,7 +904,7 @@ def get_individual_by_provider(p_id):
     except:
         flash ("Error: unable to fetch individual")
     curs.close()
-    results=tuple([x[1:7] for x in list(result)])
+    results=tuple([x[1:7] for x in list(result) if x[1] is not None])
     new_columns, display_results = change_for_display(columns[1:7], results)
     return render_template("mysql.html", title='Query was: individuals from provider ="' + result[0][-1]+'"', url_param=['individual', 0,  ], results=[new_columns[:-1], remove_column(display_results, 'L')])
 
