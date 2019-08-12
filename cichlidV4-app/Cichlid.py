@@ -1,4 +1,5 @@
 #!/Library/Frameworks/Python.framework/Versions/3.7/bin/python3
+ #/usr/bin/python3 for web version
 from flask import Flask, render_template, request,  flash, redirect, url_for, session, send_file
 from flask_mysqldb import MySQL
 from flask_migrate import Migrate
@@ -13,8 +14,13 @@ from forms import LoginForm, RegistrationForm, EntryForm, EnterDataForm
 from config import Config
 app = Flask(__name__)
 
+'''
+    Website script written by H. Denise (Cambridge Uni) 6/08/2019
+    Script still in progress with optimisation and code clean-up to be carried out
+    Also upload of data need to be fully implemented
+'''
 
-config_file_path='./Cichlid_dbV4.json'
+config_file_path='./Cichlid_dbV4.json'       # for web version: '/www/hd2/www-dev/other-sites/darwin-tracking.sanger.ac.uk/cichlidV4-app/Cichlid_dbV4.json'
 configSettings = json.load(open(config_file_path, 'r'))
 app.config.from_object(Config)
 app.config['MYSQL_HOST'] = configSettings["MySQL_host"]
@@ -93,8 +99,6 @@ def change_for_display(col, data):
         list_old_data.append(list(tup))
     #RELABELLING THE COLUMN_NAMES
     for field_index in range(1, len(col)):
-        print(field_index)
-        print(col[field_index])
         table2=""
         if col[field_index].endswith("_id"):
             table=col[field_index][:-3]
@@ -119,7 +123,6 @@ def change_for_display(col, data):
                             columns[field_index]= 'source_location'
     #special case for location where several fields are returned
     if 'source_location' in columns:
-        print("add")
         columns.insert(columns.index('source_location')+1, 'geographical_region')
         columns.insert(columns.index('source_location')+2, 'country')
         columns.insert(columns.index('source_location')+3, 'latitude')
@@ -265,7 +268,6 @@ def add_data_to_tuple(old_tuple, new_data):
 def transpose_table(col, data):
     """transpose data from horizontal display to vertical one"""
     new_data=[]
-    print(col)
     l=[]
     nl=[]
 
@@ -282,7 +284,6 @@ def transpose_table(col, data):
             l.append(index)
         else:
             nl.append(index)
-
     index_col=[]
     if col[0]=='individual_id':
         if len([i for i in l if i>5 and i<11 ]) >0:
@@ -302,13 +303,7 @@ def transpose_table(col, data):
             index_col.append(min([i for i in l if i>8 and i<11]))
         if 8 in l:
             index_col.append(8)
-
-
-
-
-    print(index_col)
     name_col=[col[x] for x in index_col]
-    print (name_col)
     return new_data, name_col
 
 def remove_column(original_tuple, col_idx):
@@ -335,7 +330,7 @@ def index():
         session['usrname']=""
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT accession, name FROM PROJECT")
+        curs.execute("SELECT accession, name FROM project")
         prows=curs.fetchall()
     except:
         flash ("Error: unable to fetch projects")
@@ -420,7 +415,7 @@ def login():
         details=request.form
         curs = mysql.connection.cursor()
         try:
-            curs.execute("SELECT * FROM USERS where username ='%s';" % details['username'])
+            curs.execute("SELECT * FROM users where username ='%s';" % details['username'])
             rows=curs.fetchall()
         except:
             flash ("Error: unable to fetch items")
@@ -457,7 +452,7 @@ def register():
             email = form.email.data
             password = hash_password(form.password.data)
             curs = mysql.connection.cursor()
-            x = curs.execute("SELECT * FROM USERS WHERE username = '{user}';".format(user=username))
+            x = curs.execute("SELECT * FROM users WHERE username = '{user}';".format(user=username))
             if int(x) > 0:
                 flash("That username is already taken, please choose another")
                 return render_template('register.html', form=form)
@@ -487,7 +482,7 @@ def enter_data():
     provider_list=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT provider_name FROM PROVIDER")
+        curs.execute("SELECT provider_name FROM provider")
         provider_res=curs.fetchall()
     except:
         flash ("Error: unable to fetch provider names")
@@ -528,11 +523,11 @@ def upload(file):
 def get_files_per_lane_id(la_id):
     id_results=[]
     results=[]
-    lcolumns=get_columns_from_table('FILE')
+    lcolumns=get_columns_from_table('file')
     columns=tuple([lcolumns[1]]+[lcolumns[3]]+[lcolumns[2]]+list(lcolumns[4:]))
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT f.*, l.accession FROM FILE f join LANE l on f.lane_id=l.lane_id where f.latest=1 and f.lane_id = '%s';" % la_id)
+        curs.execute("SELECT f.*, l.accession FROM file f join lane l on f.lane_id=l.lane_id where f.latest=1 and f.lane_id = '%s';" % la_id)
         fresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch files")
@@ -545,19 +540,18 @@ def get_files_per_lane_id(la_id):
     new_columns= list(new_column)
     new_columns[5]='file_type'
     v_display_results, split_col=transpose_table(new_columns, display_results)
-    print(tuple(split_col))
     return render_template("mysqlV.html", title='Query was: file(s) where lane_accession = "' + str(l_accession)+'"', view_param=split_col, results=[v_display_results])
 
 @app.route('/api/1.0/images/', methods=['GET'])
 def get_images():
     id_results=[]
     results=[]
-    columns=get_columns_from_table('IMAGE')
+    columns=get_columns_from_table('image')
     col=[columns[0]]+[columns[2]]+[columns[1]]+['thumbnail']+list(columns[3:])
     columns=tuple(col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM IMAGE where latest=1")
+        curs.execute("SELECT * FROM image where latest=1")
         img_results=curs.fetchall()
     except:
         flash ("Error: unable to fetch images")
@@ -570,11 +564,11 @@ def get_images():
 
 @app.route('/api/1.0/individual/', methods=['GET'])
 def get_individuals():
-    icolumns=get_columns_from_table('INDIVIDUAL')
+    icolumns=get_columns_from_table('individual')
     columns=icolumns[1:7]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM INDIVIDUAL where latest=1")
+        curs.execute("SELECT * FROM individual where latest=1")
         results=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
@@ -586,12 +580,12 @@ def get_individuals():
 
 @app.route('/api/1.0/individual/<i_id>', methods=['GET'])
 def get_individual_per_individual_id(i_id):
-    columns=get_columns_from_table('INDIVIDUAL')
-    id_columns=get_columns_from_table('INDIVIDUAL_DATA')
+    columns=get_columns_from_table('individual')
+    id_columns=get_columns_from_table('individual_data')
     results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM INDIVIDUAL i left join INDIVIDUAL_DATA id on id.individual_id=i.individual_id where i.individual_id = '{identif}' and i.latest=1;". format(identif=i_id))
+        curs.execute("SELECT * FROM individual i left join individual_data id on id.individual_id=i.individual_id where i.individual_id = '{identif}' and i.latest=1;". format(identif=i_id))
         i_results=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
@@ -602,18 +596,17 @@ def get_individual_per_individual_id(i_id):
     new_column, display_results= change_for_display(columns[1:]+id_columns[2:6], results)
     new_columns=list(new_column)
     v_display_results, split_col=transpose_table(new_columns, display_results)
-    print (new_columns)
     return render_template("mysqlV.html", title='Query was: individual = "' + str(results[0][1]) +'"', view_param=split_col, results=[v_display_results])
 
 @app.route('/api/1.0/individual/<ind_name>/', methods=['GET'])
 def get_individual_per_individual_name(ind_name):
     ind_list=ind_name.replace(" ","").replace(",", "','")
-    columns=get_columns_from_table('INDIVIDUAL')
-    id_columns=get_columns_from_table('INDIVIDUAL_DATA')
+    columns=get_columns_from_table('individual')
+    id_columns=get_columns_from_table('individual_data')
     results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM INDIVIDUAL i left join INDIVIDUAL_DATA id on i.individual_id=id.individual_id where i.name in ('{identif}') or i.alias in ('{identif}') ". format(identif=ind_list))
+        curs.execute("SELECT * FROM individual i left join individual_data id on i.individual_id=id.individual_id where i.name in ('{identif}') or i.alias in ('{identif}') ". format(identif=ind_list))
         iresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
@@ -629,10 +622,10 @@ def get_individual_per_individual_name(ind_name):
 def get_individual_per_name_and_species_name(ind_name, sp_name):
     results=[]
     ind_list=ind_name.replace(" ","").replace(",", "','")
-    columns=get_columns_from_table('INDIVIDUAL')
+    columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.* FROM INDIVIDUAL i join SPECIES s on i.species_id=s.species_id WHERE s.name like '%%{spn}%%' and (i.name in ('{i_l}') or i.alias in ('{i_l}'));". format(spn=sp_name, i_l=ind_list))
+        curs.execute("SELECT i.* FROM individual i join species s on i.species_id=s.species_id WHERE s.name like '%%{spn}%%' and (i.name in ('{i_l}') or i.alias in ('{i_l}'));". format(spn=sp_name, i_l=ind_list))
         res=curs.fetchall()
     except:
         flash ("Error: unable to fetch items")
@@ -640,8 +633,6 @@ def get_individual_per_name_and_species_name(ind_name, sp_name):
         flash('No individual with the criteria provided')
         return redirect(url_for('index'))
     results=tuple([x[1:6] for x in list(res)])
-    print(results)
-    print(columns)
     new_columns, display_results = change_for_display(columns[1:7], results)
     return render_template("mysql.html", title='Query was : individual(s) where individual name = "'+str(ind_name)+'" & species like "'+str(sp_name)+ '"', url_param=['individual', 0], results=[new_columns[:-1], display_results])
 
@@ -649,11 +640,11 @@ def get_individual_per_name_and_species_name(ind_name, sp_name):
 def get_lanes():
     id_results=[]
     results=[]
-    lcolumns=get_columns_from_table('LANE')
+    lcolumns=get_columns_from_table('lane')
     columns=list(lcolumns[:2])+[lcolumns[7]]+[lcolumns[6]]+list(lcolumns[2:6]) +list(lcolumns[7:])
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM LANE where latest=1")
+        curs.execute("SELECT * FROM lane where latest=1")
         lresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch lanes")
@@ -669,12 +660,12 @@ def get_lanes():
 def get_lanes_per_sample_id(spl_id):
     id_results=[]
     results=[]
-    lcolumns=get_columns_from_table('LANE')
+    lcolumns=get_columns_from_table('lane')
     #columns=lcolumns[1:]
     columns=tuple([lcolumns[1]]+[lcolumns[7]]+[lcolumns[6]]+list(lcolumns[2:6])+list(lcolumns[7:]))
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT l.*, s.name FROM LANE l join SAMPLE s on s.sample_id=l.sample_id where l.latest=1 and l.sample_id = '%s';" % spl_id)
+        curs.execute("SELECT l.*, s.name FROM lane l join sample s on s.sample_id=l.sample_id where l.latest=1 and l.sample_id = '%s';" % spl_id)
         lresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch lanes")
@@ -689,12 +680,12 @@ def get_lanes_per_sample_id(spl_id):
 
 @app.route('/api/1.0/location/', methods=['GET'])
 def get_location():
-    loc_columns=get_columns_from_table('LOCATION')
+    loc_columns=get_columns_from_table('location')
     columns=[loc_columns[0]]+[loc_columns[3]]+list(loc_columns[1:3])+list(loc_columns[4:])
     results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM LOCATION")
+        curs.execute("SELECT * FROM location")
         l_results=curs.fetchall()
     except:
         flash ("Error: unable to fetch locations")
@@ -705,11 +696,11 @@ def get_location():
 
 @app.route('/api/1.0/location/<loc_id>/individual/', methods=['GET'])
 def get_individual_per_location_id(loc_id):
-    columns=get_columns_from_table('INDIVIDUAL')[1:]
+    columns=get_columns_from_table('individual')[1:]
     results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, l.source_location, l.geographical_region FROM INDIVIDUAL i join LOCATION l on i.location_id=l.location_id where l.location_id = '%s' and i.latest=1;" % loc_id)
+        curs.execute("SELECT i.*, l.source_location, l.geographical_region FROM individual i join location l on i.location_id=l.location_id where l.location_id = '%s' and i.latest=1;" % loc_id)
         res=curs.fetchall()
         iresults=remove_column(res, 1)
     except:
@@ -719,19 +710,16 @@ def get_individual_per_location_id(loc_id):
         results.append(list(row[:7]))
         if row[-2] is not None:
             loc_name=row[-2]+", "+row[-1]
-        else:
-            loc_name=row[-1]
-    print(columns)
-    print(results)
+        else: loc_name=row[-1]
     new_columns, display_results = change_for_display(columns[:7], results)
     return render_template("mysql.html", title='Query was: individual(s) where location = "' + str(loc_name) +'"', url_param=['individual', 0,], results=[new_columns[:-1], remove_column(display_results, 'L')])
 
 @app.route('/api/1.0/location/<loc_region>', methods=['GET'])
 def get_individual_per_location(loc_region):
-    loc_columns=get_columns_from_table('INDIVIDUAL')
+    loc_columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT I.* FROM INDIVIDUAL I join LOCATION L on L.location_id = I.location_id \
+        curs.execute("SELECT I.* FROM individual I join location L on L.location_id = I.location_id \
         where L.geographical_region = '%s';" % loc_region)
         res=curs.fetchall()
     except:
@@ -743,13 +731,13 @@ def get_individual_per_location(loc_region):
 
 @app.route('/api/1.0/location/<loc_region>/individual/<ind_name>', methods=['GET'])
 def get_individual_per_name_and_per_location(loc_region, ind_name):
-    loc_columns=get_columns_from_table('INDIVIDUAL')
+    loc_columns=get_columns_from_table('individual')
     columns=loc_columns[1:7]
     ind_list=ind_name.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT I.* FROM INDIVIDUAL I join LOCATION L on L.location_id = I.location_id \
-        join SPECIES S on S.species_id = I.species_id where L.geographical_region = '{reg}' and (I.name in ('{indl}') or I.alias in ('{indl}')) ;". format(reg=loc_region, indl=ind_list))
+        curs.execute("SELECT I.* FROM individual I join location L on L.location_id = I.location_id \
+        join species S on S.species_id = I.species_id where L.geographical_region = '{reg}' and (I.name in ('{indl}') or I.alias in ('{indl}')) ;". format(reg=loc_region, indl=ind_list))
         res=curs.fetchall()
     except:
         flash ("Error: unable to fetch location and / or individual")
@@ -760,11 +748,11 @@ def get_individual_per_name_and_per_location(loc_region, ind_name):
 
 @app.route('/api/1.0/location/<loc_region>/species/<sp_name>', methods=['GET'])
 def get_species_per_name_and_per_location(loc_region, sp_name):
-    loc_columns=get_columns_from_table('INDIVIDUAL')
+    loc_columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT I.* FROM INDIVIDUAL I join LOCATION L on L.location_id = I.location_id \
-        join SPECIES S on S.species_id = I.species_id where L.geographical_region = '{reg}' and S.name like '%%{spn}%%';". format(reg=loc_region, spn=sp_name))
+        curs.execute("SELECT I.* FROM individual I join location L on L.location_id = I.location_id \
+        join species S on S.species_id = I.species_id where L.geographical_region = '{reg}' and S.name like '%%{spn}%%';". format(reg=loc_region, spn=sp_name))
         res=curs.fetchall()
     except:
         flash ("Error: unable to fetch location and / or species")
@@ -775,13 +763,13 @@ def get_species_per_name_and_per_location(loc_region, sp_name):
 
 @app.route('/api/1.0/material/', methods=['GET'])
 def get_material():
-    scolumns=get_columns_from_table('MATERIAL')
+    scolumns=get_columns_from_table('material')
     columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[12]])+scolumns[5:12]+scolumns[13:]
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT material_id, name, individual_id, accession, developmental_stage_id, provider_id, date_received, \
         storage_condition, storage_location, type, volume, concentration, organism_part_id, changed, \
-        latest FROM MATERIAL where latest=1")
+        latest FROM material where latest=1")
         results=curs.fetchall()
     except:
         flash ("Error: unable to fetch materials")
@@ -791,10 +779,10 @@ def get_material():
 
 @app.route('/api/1.0/project/', methods=['GET'])
 def get_projects():
-    columns=get_columns_from_table('PROJECT')
+    columns=get_columns_from_table('project')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM PROJECT")
+        curs.execute("SELECT * FROM project")
         results=curs.fetchall()
     except:
         flash ("Error: unable to fetch projects")
@@ -804,7 +792,7 @@ def get_projects():
 @app.route('/api/1.0/project/<accession>', methods=['GET'])
 def get_project_per_accession(accession):
     results=[]
-    columns=get_columns_from_table('INDIVIDUAL')
+    columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
@@ -826,7 +814,7 @@ def get_project_per_accession(accession):
 def get_individual_per_project_accession_and_name(accession, ind_name):
     results=[]
     ind_list=ind_name.replace(" ","").replace(",", "','")
-    columns=get_columns_from_table('INDIVIDUAL')
+    columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
         query=("SELECT * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
@@ -845,14 +833,14 @@ def get_individual_per_project_accession_and_name(accession, ind_name):
 
 @app.route('/api/1.0/project/<accession>/location/<loc_region>', methods=['GET'])
 def get_project_per_accession_and_location(accession, loc_region):
-    loc_columns=get_columns_from_table('INDIVIDUAL')
+    loc_columns=get_columns_from_table('individual')
     columns=loc_columns[1:7]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT I.* FROM INDIVIDUAL I join LOCATION L on L.location_id = I.location_id \
-        join SPECIES S on S.species_id = I.species_id \
+        curs.execute("SELECT I.* FROM individual I join location L on L.location_id = I.location_id \
+        join species S on S.species_id = I.species_id \
         left outer join allocation A on A.individual_id=I.individual_id \
-        left outer join PROJECT P on P.project_id=A.project_id \
+        left outer join project P on P.project_id=A.project_id \
         where L.geographical_region = '{reg}' and P.accession = '{acc}'". format(reg=loc_region, acc=accession))
         res=curs.fetchall()
     except:
@@ -865,7 +853,7 @@ def get_project_per_accession_and_location(accession, loc_region):
 @app.route('/api/1.0/project/<accession>/species/<sp_name>', methods=['GET'])
 def get_individual_per_project_accession_and_species(accession, sp_name):
     results=()
-    columns=get_columns_from_table('INDIVIDUAL')
+    columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
@@ -884,10 +872,10 @@ def get_individual_per_project_accession_and_species(accession, sp_name):
 
 @app.route('/api/1.0/provider/', methods=['GET'])
 def get_provider():
-    columns=get_columns_from_table('PROVIDER')
+    columns=get_columns_from_table('provider')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM PROVIDER where latest=1")
+        curs.execute("SELECT * FROM provider where latest=1")
         results=curs.fetchall()
     except:
         flash ("Error: unable to fetch provider")
@@ -896,15 +884,16 @@ def get_provider():
 
 @app.route('/api/1.0/provider/<p_id>/individual', methods=['GET'])
 def get_individual_by_provider(p_id):
-    columns=get_columns_from_table('INDIVIDUAL')
+    columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, p.provider_name FROM INDIVIDUAL i left join PROVIDER p on p.provider_id=i.provider_id where i.provider_id ='%s';" % p_id)
+        curs.execute("SELECT i.*, p.provider_name FROM individual i right join provider p on p.provider_id=i.provider_id where p.provider_id ='%s';" % p_id)
         result=curs.fetchall()
     except:
         flash ("Error: unable to fetch individual")
     curs.close()
     results=tuple([x[1:7] for x in list(result) if x[1] is not None])
+    print(results)
     new_columns, display_results = change_for_display(columns[1:7], results)
     return render_template("mysql.html", title='Query was: individuals from provider ="' + result[0][-1]+'"', url_param=['individual', 0,  ], results=[new_columns[:-1], remove_column(display_results, 'L')])
 
@@ -912,13 +901,13 @@ def get_individual_by_provider(p_id):
 def get_samples():
     id_results=[]
     results=[]
-    scolumns=get_columns_from_table('SAMPLE')
+    scolumns=get_columns_from_table('sample')
     col=tuple([scolumns[1]]+[scolumns[5]]+["individual_id"]+list(scolumns[3:4])+list(scolumns[6:]))
     updated_col=col
     columns=tuple(updated_col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM SAMPLE where latest=1")
+        curs.execute("SELECT * FROM sample where latest=1")
         sresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch samples")
@@ -938,13 +927,13 @@ def get_samples():
 def get_samples_per_material_name(m_id):
     id_results=[]
     results=[]
-    scolumns=get_columns_from_table('SAMPLE')
+    scolumns=get_columns_from_table('sample')
     col=tuple([scolumns[1]]+[scolumns[5]]+["individual_name"]+list(scolumns[3:4])+list(scolumns[6:]))
     updated_col=col
     columns=tuple(updated_col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM SAMPLE where material_id = '%s' ;" % m_id)
+        curs.execute("SELECT * FROM sample where material_id = '%s' ;" % m_id)
         sresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch samples")
@@ -962,11 +951,11 @@ def get_samples_per_material_name(m_id):
 
 @app.route('/api/1.0/species/', methods=['GET'])
 def get_species():
-    scolumns=get_columns_from_table('SPECIES')
+    scolumns=get_columns_from_table('species')
     columns=scolumns[1:]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM SPECIES where latest=1")
+        curs.execute("SELECT * FROM species where latest=1")
         results=curs.fetchall()
     except:
         flash ("Error: unable to fetch species")
@@ -977,11 +966,11 @@ def get_species():
 
 @app.route('/api/1.0/species/<sp_id>/individual/', methods=['GET'])
 def get_individual_per_species_name(sp_id):
-    columns=get_columns_from_table('INDIVIDUAL')[1:7]
+    columns=get_columns_from_table('individual')[1:7]
     results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, s.name FROM INDIVIDUAL i join SPECIES s on i.species_id=s.species_id where s.species_id = '%s';" % sp_id)
+        curs.execute("SELECT i.*, s.name FROM individual i join species s on i.species_id=s.species_id where s.species_id = '%s';" % sp_id)
         sresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
@@ -996,11 +985,11 @@ def get_individual_per_species_name(sp_id):
 @app.route('/api/1.0/species/<sp_name>', methods=['GET'])
 def get_species_per_name(sp_name):
     results=tuple()
-    scolumns=get_columns_from_table('SPECIES')
+    scolumns=get_columns_from_table('species')
     columns=scolumns[1:]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM SPECIES where latest=1 and name like '%%%s%%'" % sp_name)
+        curs.execute("SELECT * FROM species where latest=1 and name like '%%%s%%'" % sp_name)
         results=curs.fetchall()
     except:
         flash ("Error: unable to fetch species")
@@ -1012,11 +1001,11 @@ def get_species_per_name(sp_name):
 @app.route('/api/1.0/species/tax_id/<tax_id>', methods=['GET'])
 def get_individual_per_tax_id(tax_id):
     results=tuple()
-    scolumns=get_columns_from_table('INDIVIDUAL')
+    scolumns=get_columns_from_table('individual')
     columns=scolumns[1:]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.* FROM INDIVIDUAL i join SPECIES s on s.species_id=i.species_id where s.taxon_id = '%s' and i.latest=1" % tax_id)
+        curs.execute("SELECT i.* FROM individual i join species s on s.species_id=i.species_id where s.taxon_id = '%s' and i.latest=1" % tax_id)
         results=curs.fetchall()
     except:
         flash ("Error: unable to fetch species")
