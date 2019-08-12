@@ -10,7 +10,7 @@ from MySQLdb import escape_string as thwart
 import gc, json
 import os, binascii
 from flask_mail import Message, Mail
-from forms import LoginForm, RegistrationForm, EntryForm, EnterDataForm
+from forms import LoginForm, RegistrationForm, EntryForm, EnterDataForm, ViewForm
 from config import Config
 app = Flask(__name__)
 
@@ -588,6 +588,7 @@ def get_individual_per_individual_id(i_id):
     columns=get_columns_from_table('individual')
     id_columns=get_columns_from_table('individual_data')
     results=[]
+    all_results=[]
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT * FROM individual i left join individual_data id on id.individual_id=i.individual_id where i.individual_id = '{identif}';". format(identif=i_id))
@@ -597,11 +598,20 @@ def get_individual_per_individual_id(i_id):
     curs.close()
     for row in i_results:
         i_results=list(row[1:16])+list(row[18:22])
-        results.append(i_results)
+        if row[15]==1:
+            results.append(i_results)
+        all_results.append(i_results)
+        #1 display results
+    if len(results) > len(all_results):
+        print(":88888")
+        #1 display button on mysqlV
+        #2 if button clicm:
+        results=all_results
+
     new_column, display_results= change_for_display(columns[1:]+id_columns[2:6], results)
     new_columns=list(new_column)
     v_display_results, split_col=transpose_table(new_columns, display_results)
-    return render_template("mysqlV.html", title='Query was: individual = "' + str(results[0][1]) +'"', view_param=split_col, results=[v_display_results])
+    return render_template("mysqlV.html", title='Query was: individual = "' + str(results[0][1]) +'"', view_param=split_col, results=[v_display_results]) #form=form)
 
 @app.route('/api/1.0/individual/<ind_name>/', methods=['GET'])
 def get_individual_per_individual_name(ind_name):
@@ -609,6 +619,7 @@ def get_individual_per_individual_name(ind_name):
     columns=get_columns_from_table('individual')
     id_columns=get_columns_from_table('individual_data')
     results=[]
+    all_results=[]
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT * FROM individual i left join individual_data id on i.individual_id=id.individual_id where i.name in ('{identif}') or i.alias in ('{identif}') ". format(identif=ind_list))
@@ -619,7 +630,11 @@ def get_individual_per_individual_name(ind_name):
     if len(iresults) > 0:
         for row in iresults:
             i_results=list(row[1:16])+list(row[18:22])
-            results.append(i_results)
+            if row[15] ==1:
+                results.append(i_results)
+            all_results.append(i_results)
+        if len(all_results) > len(results):
+            results=all_results
         new_columns, display_results= change_for_display(columns[1:]+id_columns[2:6], results)
         v_display_results, split_col=transpose_table(new_columns, display_results)
     else:
