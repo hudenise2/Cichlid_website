@@ -1,12 +1,12 @@
 {
   "MySQL_host": "localhost",
-  "MySQL_pswd": "xxxxxxxxx",
+  "MySQL_pswd": "m3ridian19My",
   "MySQL_usr": "root",
   "MySQL_db": "CICHLID_TRACKINGV4",
-  "Mail_server": "xxxxxxxxx",
+  "Mail_server": "m3ridian19My",
   "Mail_port": "465",
-  "Mail_usrn": "had38@cam.ac.uk",
-  "Mail_pswd" : "xxxxxxxx",
+  "Mail_usrn": "hudenise2@gmail.com",
+  "Mail_pswd" : "m3ridian19Go",
   "Mail_SSL" :  "True",
   "Mail_TLS" : "False"
 }
