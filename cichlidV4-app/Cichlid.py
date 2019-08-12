@@ -149,7 +149,7 @@ def change_for_display(col, data):
         if 'source_location' in columns:
             if row[columns.index('source_location')] is None:
                 for idx in range(1,5):
-                    row.insert(columns.index('source_location')+idx, None)
+                    row.insert(columns.index('source_location')+idx, '')
             else:
                 for idx in range(1,5):
                     row.insert(columns.index('source_location')+idx, row[columns.index('source_location')][idx])
@@ -164,6 +164,7 @@ def change_for_display(col, data):
         if 'nber_reads' in columns and row[columns.index('nber_reads')] is not None:
             row[columns.index('nber_reads')]= str(format(row[columns.index('nber_reads')],"*>3,d"))
         #get the image details
+        row=['' if x is None else x for x in row]
         if columns[0]=='individual_id':
             curs = mysql.connection.cursor()
             curs.execute("SELECT filepath, filename FROM image WHERE individual_id= '{id}';". format(id=row[0]))
@@ -172,7 +173,7 @@ def change_for_display(col, data):
             if im_res:
                 row.append("/".join(list(im_res[0])))
             else:
-                row.append('None')
+                row.append('')
             if 'thumbnail' not in columns: columns.append('thumbnail')
         #add to columns and row if there is an image path
         list_new_data.append(tuple(row))
@@ -250,7 +251,7 @@ def reformat_comment(col, data):
         #ensure that all lines have the same length than 'columns'
         if len(entry) != len(col):
             for i in range(0, len(col)-len(entry)):
-                entry.insert(len(entry)-1,None)
+                entry.insert(len(entry)-1,'')
     return(col, new_data)
 
 def add_data_to_tuple(old_tuple, new_data):
@@ -279,7 +280,7 @@ def transpose_table(col, data):
         for entry in data:
             new_list.append(entry[index])
         #only keep info if there is data to display
-        if new_list.count(None)!=len(data) and new_list.count('None')!=len(data):
+        if new_list.count(None)!=len(data) and new_list.count('None')!=len(data) and new_list.count('')!=len(data):
             new_data.append(new_list)
             l.append(index)
         else:
@@ -370,6 +371,10 @@ def index():
             flash('Please enter your selection')
             return redirect(url_for('index'))
         if flag=="AIS": flag='AI'
+        if flag=="AIL": flag='IL'
+        if flag=="ASL": flag='AL'
+        if flag=="ISL": flag='IL'
+        if flag=='AISL': flag='AI'
         url_dic={'A':'get_project_per_accession', 'I': 'get_individual_per_individual_name', 'S': 'get_species_per_name',
         'AI':'get_individual_per_project_accession_and_name', 'AS': 'get_individual_per_project_accession_and_species',
         'AL':'get_project_per_accession_and_location', 'IL':'get_individual_per_name_and_per_location',
@@ -585,7 +590,7 @@ def get_individual_per_individual_id(i_id):
     results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM individual i left join individual_data id on id.individual_id=i.individual_id where i.individual_id = '{identif}' and i.latest=1;". format(identif=i_id))
+        curs.execute("SELECT * FROM individual i left join individual_data id on id.individual_id=i.individual_id where i.individual_id = '{identif}';". format(identif=i_id))
         i_results=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
@@ -611,11 +616,15 @@ def get_individual_per_individual_name(ind_name):
     except:
         flash ("Error: unable to fetch individuals")
     curs.close()
-    for row in iresults:
-        i_results=list(row[1:16])+list(row[18:22])
-        results.append(i_results)
-    new_columns, display_results= change_for_display(columns[1:]+id_columns[2:6], results)
-    v_display_results, split_col=transpose_table(new_columns, display_results)
+    if len(iresults) > 0:
+        for row in iresults:
+            i_results=list(row[1:16])+list(row[18:22])
+            results.append(i_results)
+        new_columns, display_results= change_for_display(columns[1:]+id_columns[2:6], results)
+        v_display_results, split_col=transpose_table(new_columns, display_results)
+    else:
+        flash("unable to fetch the individual(s)")
+        return redirect(url_for('index'))
     return render_template("mysqlV.html", title='Query was: individual = "' + str(ind_name) +'"', view_param=split_col, results=[v_display_results])
 
 @app.route('/api/1.0/individual/<ind_name>/species/<sp_name>', methods=['GET'])
@@ -690,8 +699,10 @@ def get_location():
     except:
         flash ("Error: unable to fetch locations")
     for row in l_results:
+        row=['' if x is None else x for x in row]
         results.append([row[0]]+[row[3]]+list(row[1:3])+list(row[4:]))
     curs.close()
+
     return render_template("mysql.html", title='Query was: all locations', url_param=['location',0,'/individual'], results=[columns,results])
 
 @app.route('/api/1.0/location/<loc_id>/individual/', methods=['GET'])
@@ -732,7 +743,7 @@ def get_individual_per_location(loc_region):
 @app.route('/api/1.0/location/<loc_region>/individual/<ind_name>', methods=['GET'])
 def get_individual_per_name_and_per_location(loc_region, ind_name):
     loc_columns=get_columns_from_table('individual')
-    columns=loc_columns[1:7]
+    columns=loc_columns[1:8]
     ind_list=ind_name.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
     try:
@@ -742,7 +753,7 @@ def get_individual_per_name_and_per_location(loc_region, ind_name):
     except:
         flash ("Error: unable to fetch location and / or individual")
     curs.close
-    results=tuple([x[1:7] for x in list(res)])
+    results=tuple([x[1:8] for x in list(res)])
     new_columns, display_results= change_for_display(columns, results)
     return render_template("mysql.html", title='Query was: individual(s) where geographical_region = "'+ loc_region +'" and individual name = "'+ind_name+'"', url_param=['individual', 0, ''], results=[new_columns[:-1], remove_column(display_results, 'L')])
 
@@ -812,13 +823,13 @@ def get_project_per_accession(accession):
 
 @app.route('/api/1.0/project/<accession>/individual/<ind_name>', methods=['GET'])
 def get_individual_per_project_accession_and_name(accession, ind_name):
-    results=[]
+    result=[]
     ind_list=ind_name.replace(" ","").replace(",", "','")
     columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
         query=("SELECT * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
-        where p.project_id  = a.project_id and p.accession = '{acc}') and (individual.name in ('{i_list}') or individual.alias in ('{i_list}'));". format(acc=accession, i_list=ind_list))
+        where p.project_id  = a.project_id and p.accession = '{acc}') and (individual.name in ('{i_list}') or individual.alias in ('{i_list}')) and latest=1;". format(acc=accession, i_list=ind_list))
         curs.execute(query)
         result=curs.fetchall()
     except:
@@ -893,7 +904,6 @@ def get_individual_by_provider(p_id):
         flash ("Error: unable to fetch individual")
     curs.close()
     results=tuple([x[1:7] for x in list(result) if x[1] is not None])
-    print(results)
     new_columns, display_results = change_for_display(columns[1:7], results)
     return render_template("mysql.html", title='Query was: individuals from provider ="' + result[0][-1]+'"', url_param=['individual', 0,  ], results=[new_columns[:-1], remove_column(display_results, 'L')])
 
@@ -937,16 +947,20 @@ def get_samples_per_material_name(m_id):
         sresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch samples")
-    for row in sresults:
-        try:
-            curs.execute("SELECT i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
-            id_return=curs.fetchall()
-        except:
-            flash ("Error: unable to fetch items")
-        id_results=[row[1]]+[row[5]]+[id_return[0][0]]+list(row[3:4])+list(row[6:])
-        results.append(tuple(id_results))
-        m_name=id_return[0][2]
-    curs.close()
+    if len(sresults) > 0:
+        for row in sresults:
+            try:
+                curs.execute("SELECT i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
+                id_return=curs.fetchall()
+            except:
+                flash ("Error: unable to fetch items")
+            id_results=[row[1]]+[row[5]]+[id_return[0][0]]+list(row[3:4])+list(row[6:])
+            results.append(tuple(id_results))
+            m_name=id_return[0][2]
+        curs.close()
+    else:
+        flash("no sample associated with this material name")
+        return redirect(url_for('index'))
     return render_template("mysql.html", title='Query was: sample(s) where material_name = "' +str(m_name)+'"', url_param=['lane', 0,], results=[columns,results])
 
 @app.route('/api/1.0/species/', methods=['GET'])
