@@ -822,7 +822,7 @@ def get_project_per_accession(accession):
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
-        where p.project_id  = a.project_id and p.accession = '%s');" % accession)
+        where p.project_id  = a.project_id and p.accession = '%s') and latest=1;" % accession)
         results=curs.fetchall()
     except:
         flash ("Error: unable to fetch items")
@@ -884,7 +884,7 @@ def get_individual_per_project_accession_and_species(accession, sp_name):
     try:
         curs.execute("SELECT * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
         where p.project_id  = a.project_id and p.accession = '{acc}') and species_id in (select species_id from species where \
-         name like '%%{spn}%%');". format(acc=accession, spn=sp_name))
+         name like '%%{spn}%%') and latest=1;". format(acc=accession, spn=sp_name))
         result=curs.fetchall()
     except:
         flash ("Error: unable to fetch items")
@@ -913,7 +913,7 @@ def get_individual_by_provider(p_id):
     columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, p.provider_name FROM individual i right join provider p on p.provider_id=i.provider_id where p.provider_id ='%s';" % p_id)
+        curs.execute("SELECT i.*, p.provider_name FROM individual i right join provider p on p.provider_id=i.provider_id where i.latest=1 and p.provider_id ='%s';" % p_id)
         result=curs.fetchall()
     except:
         flash ("Error: unable to fetch individual")
@@ -999,7 +999,7 @@ def get_individual_per_species_name(sp_id):
     results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, s.name FROM individual i join species s on i.species_id=s.species_id where s.species_id = '%s';" % sp_id)
+        curs.execute("SELECT i.*, s.name FROM individual i join species s on i.species_id=s.species_id where i.latest=1 and s.species_id = '%s';" % sp_id)
         sresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
