@@ -30,6 +30,7 @@ class EntryForm(FlaskForm):
     '''
     name = StringField('and / or provide individual name(s) or alias(es) (comma separated)')
     spname = StringField('and / or provide a species name (partial name accepted)')
+    sname = StringField('and / or provide a sample name(s) or accession(s) (comma separated)')
     submit = SubmitField('Search database')
 
 class EnterDataForm(FlaskForm):
@@ -78,3 +79,9 @@ class EnterDataForm(FlaskForm):
     pv_phone = StringField('Phone: ')
     pv_address = StringField('Address: ')
     submit = SubmitField('Submit Data')
+
+class ViewForm(FlaskForm):
+    '''
+    section to choose the individual view content
+    '''
+    submit = SubmitField('View all individuals')

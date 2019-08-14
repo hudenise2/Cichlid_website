@@ -52,6 +52,8 @@
   <p> {{url_param}} </p>
  <body>
    <table class="TFtable" id="TFtable" >
+
+
      <tbody>
        {% for row in results %}
           {% for data in row[:-1] %}
@@ -85,7 +87,7 @@
      {% endfor %}
    </tbody>
    </table>
- </body>
+  </body>
 
    <script>
    var tt = '{{ title }}'.substring(11,);

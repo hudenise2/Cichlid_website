@@ -94,6 +94,13 @@ div.a {
             <span style="color: red;">[{{ error }}]</span>
             {% endfor %}
         </p>
+        <p>
+            {{ form.sname.label }}<br>
+            {{ form.sname(size=32) }}<br>
+            {% for error in form.sname.errors %}
+            <span style="color: red;">[{{ error }}]</span>
+            {% endfor %}
+        </p>
         <br>
         <p>
           <select name= loc_choice method="GET" action="/" style="width:330px;">
