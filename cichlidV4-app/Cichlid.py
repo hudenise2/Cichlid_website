@@ -10,7 +10,7 @@ from MySQLdb import escape_string as thwart
 import gc, json
 import os, binascii
 from flask_mail import Message, Mail
-from forms import LoginForm, RegistrationForm, EntryForm, EnterDataForm, ViewForm
+from forms import LoginForm, RegistrationForm, EntryForm, EnterDataForm, DatabaseForm
 from config import Config
 app = Flask(__name__)
 
@@ -20,7 +20,7 @@ app = Flask(__name__)
     Also upload of data need to be fully implemented
 '''
 
-config_file_path='./Cichlid_dbV4.json'       # for web version: '/www/hd2/www-dev/other-sites/darwin-tracking.sanger.ac.uk/cichlidV4-app/Cichlid_dbV4.json'
+config_file_path='./Darwin_dbV1.json'       # for web version: '/www/hd2/www-dev/other-sites/darwin-tracking.sanger.ac.uk/cichlidV4-app/Cichlid_dbV4.json'
 configSettings = json.load(open(config_file_path, 'r'))
 app.config.from_object(Config)
 app.config['MYSQL_HOST'] = configSettings["MySQL_host"]
@@ -339,11 +339,12 @@ def index():
     except:
         flash ("Error: unable to fetch projects")
     try:
-        curs.execute("SELECT distinct location FROM location")
+        curs.execute("SELECT distinct location FROM location where location is not NULL")
         lrows=curs.fetchall()
     except:
         flash ("Error: unable to fetch location information")
     curs.close()
+
     for proj in prows:
         list_proj.append(proj[0]+" - " +proj[1])
     for loc in sorted(lrows):
@@ -669,7 +670,7 @@ def get_individual_per_name_and_species_name(ind_name, sp_name):
     columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.* FROM individual i join species s on i.species_id=s.species_id WHERE s.name like '%%{spn}%%' and (i.name in ('{i_l}') or i.alias in ('{i_l}'));". format(spn=sp_name, i_l=ind_list))
+        curs.execute("SELECT i.* FROM individual i join species s on i.species_id=s.species_id WHERE (s.name like '%%{spn}%%' or s.common_name like '%%{spn}%%') and (i.name in ('{i_l}') or i.alias in ('{i_l}'));". format(spn=sp_name, i_l=ind_list))
         res=curs.fetchall()
     except:
         flash ("Error: unable to fetch items")
@@ -767,7 +768,7 @@ def get_individual_per_location(location):
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT I.* FROM individual I join location L on L.location_id = I.location_id \
-        where L.location = '%s';" % location)
+        where I.latest=1 and L.location = '%s';" % location)
         res=curs.fetchall()
     except:
         flash ("Error: unable to fetch location")
@@ -799,14 +800,14 @@ def get_species_per_name_and_per_location(location, sp_name):
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT I.* FROM individual I join location L on L.location_id = I.location_id \
-        join species S on S.species_id = I.species_id where L.location = '{reg}' and S.name like '%%{spn}%%';". format(reg=location, spn=sp_name))
+        join species S on S.species_id = I.species_id where I.latest=1 and L.location = '{reg}' and (S.name like '%%{spn}%%' or S.common_name like '%%{spn}%%');". format(reg=location, spn=sp_name))
         res=curs.fetchall()
     except:
         flash ("Error: unable to fetch location and / or species")
     curs.close()
     results=tuple([x[1:8] for x in list(res)])
     new_columns, display_results= change_for_display(loc_columns[1:8], results)
-    return render_template("mysql.html", title='Query was: individual(s) where location = "'+ location +'" and species_name like "'+sp_name+'"', url_param=['individual', 0, ''], results=[new_columns[:-1], remove_column(display_results, 'L')])
+    return render_template("mysql.html", title='Query was: individual(s) where location = "'+ location +'" and species like "'+sp_name+'"', url_param=['individual', 0, ''], results=[new_columns[:-1], remove_column(display_results, 'L')])
 
 @app.route('/api/1.0/material/', methods=['GET'])
 def get_material():
@@ -906,7 +907,7 @@ def get_individual_per_project_accession_and_species(accession, sp_name):
     try:
         curs.execute("SELECT * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
         where p.project_id  = a.project_id and p.accession = '{acc}') and species_id in (select species_id from species where \
-         name like '%%{spn}%%') and latest=1;". format(acc=accession, spn=sp_name))
+         name like '%%{spn}%%' or common_name like '%%{spn}%%') and latest=1;". format(acc=accession, spn=sp_name))
         result=curs.fetchall()
     except:
         flash ("Error: unable to fetch items")
@@ -1145,7 +1146,7 @@ def get_samples_by_sample_name_and_species(sname, sp_name):
     try:
         curs.execute("select s.* from sample s join material m on m.material_id = s.material_id join individual i \
         on i.individual_id=m.individual_id left join species sp on sp.species_id=i.species_id where s.latest=1 \
-        and (s.accession in ('{s_list}') or s.name in ('{s_list}')) and sp.name like '{sp}%';".format(sp=sp_name, s_list=s_list))
+        and (s.accession in ('{s_list}') or s.name in ('{s_list}')) and (sp.name like '%{spn}%' or sp.common_name like '%{spn}%');".format(spn=sp_name, s_list=s_list))
         sresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch samples with these criteria")
@@ -1205,14 +1206,14 @@ def get_species_per_name(sp_name):
     columns=scolumns[1:]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM species where latest=1 and name like '%%%s%%'" % sp_name)
+        curs.execute("SELECT * FROM species where latest=1 and (name like '%%{spn}%%' or common_name like '%%{spn}%%')". format(spn=sp_name))
         results=curs.fetchall()
     except:
         flash ("Error: unable to fetch species")
     curs.close()
     results=remove_column(results, 1)
     new_columns, display_results= change_for_display(columns, results)
-    return render_template("mysql.html", title='Query was: all species where name contains "' + sp_name +'"', url_param=['species', 0, '/individual'],results=[new_columns,display_results])
+    return render_template("mysql.html", title='Query was: all species where name or common_name contains "' + sp_name +'"', url_param=['species', 0, '/individual'],results=[new_columns,display_results])
 
 @app.route('/api/1.0/species/tax_id/<tax_id>', methods=['GET'])
 def get_individual_per_tax_id(tax_id):

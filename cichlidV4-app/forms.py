@@ -24,12 +24,16 @@ class RegistrationForm(FlaskForm):
         'Repeat Password', validators=[DataRequired(), EqualTo('password')])
     submit = SubmitField('Register')
 
+class DatabaseForm(FlaskForm):
+    submit = SubmitField('Select database')
+
+
 class EntryForm(FlaskForm):
     '''
     section describing the entries for the home page entry form
     '''
     name = StringField('and / or provide individual name(s) or alias(es) (comma separated)')
-    spname = StringField('and / or provide a species name (partial name accepted)')
+    spname = StringField('and / or provide a species name or common name (partial name accepted)')
     sname = StringField('and / or provide a sample name(s) or accession(s) (comma separated)')
     submit = SubmitField('Search database')
 
