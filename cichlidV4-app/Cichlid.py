@@ -20,7 +20,7 @@ app = Flask(__name__)
     Also upload of data need to be fully implemented
 '''
 
-config_file_path='./Darwin_dbV1.json'       # for web version: '/www/hd2/www-dev/other-sites/darwin-tracking.sanger.ac.uk/cichlidV4-app/Cichlid_dbV4.json'
+config_file_path='./Cichlid_dbV4.json'       # for web version: '/www/hd2/www-dev/other-sites/darwin-tracking.sanger.ac.uk/cichlidV4-app/Cichlid_dbV4.json'
 configSettings = json.load(open(config_file_path, 'r'))
 app.config.from_object(Config)
 app.config['MYSQL_HOST'] = configSettings["MySQL_host"]
@@ -162,9 +162,11 @@ def change_for_display(col, data):
             else:
                 row.insert(columns.index('cv_attribute')+1, row[columns.index('cv_attribute')][1])
                 row[columns.index('cv_attribute')]= str(row[columns.index('cv_attribute')][0])
-        #reformat number of reads
+        #reformat number of reads and length data
         if 'nber_reads' in columns and row[columns.index('nber_reads')] is not None:
             row[columns.index('nber_reads')]= str(format(row[columns.index('nber_reads')],"*>3,d"))
+        if 'total_length' in columns and row[columns.index('total_length')] is not None:
+            row[columns.index('total_length')]= str(format(row[columns.index('total_length')],"*>3,d"))
         #get the image details
         row=['' if x is None else x for x in row]
         if columns[0]=='individual_id':
@@ -301,12 +303,12 @@ def transpose_table(col, data):
         if 11 in l:
             index_col.append(11)
     elif col[0]=='file_id':
-        if len([i for i in l if i>4 and i<8 ]) >0:
-            index_col.append(min([i for i in l if i>4 and i<8 ]))
-        if len([i for i in l if i>8 and i<11]) >0:
-            index_col.append(min([i for i in l if i>8 and i<11]))
-        if 8 in l:
-            index_col.append(8)
+        if len([i for i in l if i>4 and i<10 ]) >0:
+            index_col.append(min([i for i in l if i>4 and i<10 ]))
+        if len([i for i in l if i>10 and i<13]) >0:
+            index_col.append(min([i for i in l if i>10 and i<13]))
+        if 10 in l:
+            index_col.append(10)
     name_col=[col[x] for x in index_col]
     return new_data, name_col
 
@@ -322,8 +324,49 @@ def remove_column(original_tuple, col_idx):
     return (tuple(new_list))
 
 @app.route('/')
+
 @app.route('/index', methods=['GET', 'POST'])
 def index():
+    """main function for the main page where user can choose the way to interrogate the database"""
+    project_acc=""
+    individual_name=""
+    flag=""
+    list_proj=[]
+    list_loc =[]
+    if 'usrname' not in session:
+        session['usrname']=""
+    list_db = ['CICHLID_TRACKINGV4','DARWIN_TRACKINGV1','-- select --']
+    form=DatabaseForm()
+    if form.validate_on_submit():
+        details=request.form
+        if details['db_choice'][:1]=='--':
+            flash("Please select a database")
+            return redirect(url_for('index'))
+        elif details['db_choice']=='DARWIN_TRACKINGV1':
+            config_file_path="./Darwin_dbV1.json"
+        elif details['db_choice']=='CICHLID_TRACKINGV4':
+            config_file_path="./Cichlid_dbV4.json"
+
+        # for web version: '/www/hd2/www-dev/other-sites/darwin-tracking.sanger.ac.uk/cichlidV4-app/Cichlid_dbV4.json'
+        configSettings = json.load(open(config_file_path, 'r'))
+        app.config.from_object(Config)
+        app.config['MYSQL_HOST'] = configSettings["MySQL_host"]
+        app.config['MYSQL_USER'] = configSettings["MySQL_usr"]
+        app.config['MYSQL_PASSWORD'] = configSettings["MySQL_pswd"]
+        app.config['MYSQL_DB'] = configSettings["MySQL_db"]
+        mail_settings = {
+            "MAIL_SERVER": configSettings["Mail_server"],
+            "MAIL_PORT": configSettings["Mail_port"],
+            "MAIL_USE_TLS": configSettings["Mail_TLS"],
+            "MAIL_USE_SSL": configSettings["Mail_SSL"],
+            "MAIL_USERNAME": configSettings["Mail_usrn"],
+            "MAIL_PASSWORD": configSettings["Mail_pswd"]
+        }
+        return redirect(url_for('db_index', db=details['db_choice']))
+    return render_template("entry.html", title='Query was: returnall', form=form, db_list=tuple(list_db))
+
+@app.route('/db_index/<db>', methods=['GET', 'POST'])
+def db_index(db):
     """main function for the main page where user can choose the way to interrogate the database"""
     project_acc=""
     individual_name=""
@@ -430,7 +473,7 @@ def index():
         else:
             return redirect(url_for('index'))
             flash("Please enter valid criteria")
-    return render_template("entry.html", title='Query was: returnall', form=form, project_list=tuple(list_proj), loc_list=tuple(list_loc))
+    return render_template("entry2.html", title='Query was: returnall', form=form, project_list=tuple(list_proj), loc_list=tuple(list_loc), chosen_db=db)
 
 @app.route('/login/', methods=['GET', 'POST'])
 def login():
@@ -567,6 +610,7 @@ def get_files_per_lane_id(la_id):
     new_column, display_results= change_for_display(columns, results)
     new_columns= list(new_column)
     new_columns[5]='file_type'
+    print(display_results)
     v_display_results, split_col=transpose_table(new_columns, display_results)
     return render_template("mysqlV.html", title='Query was: file(s) where lane_accession = "' + str(l_accession)+'"', view_param=split_col, results=[v_display_results])
 
