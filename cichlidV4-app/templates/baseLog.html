@@ -4,11 +4,11 @@
     </head>
     <body>
         <div>
-          <h1 tyle="text-align:center;"> DURBIN'S GROUP DATABASES:
-            <a href="{{ url_for('index') }}">Home</a>
+          <h1 tyle="text-align:center;">
+            <a href="{{ url_for('index') }}">DURBIN'S GROUP DATABASES</a>
           </h1>
           <p style="text-align:right;font-size:100%;margin: 20px;">
-            <a href="{{ url_for('logout') }}">Logout</a>
+            <a href="{{ url_for('logout', db=db) }}">Logout</a>
           </p>
         </div>
        <hr>

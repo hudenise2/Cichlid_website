@@ -48,8 +48,11 @@
 	.TFtable tr:nth-child(even){
 		background: #E4EDFA;
 	}
-
-</style>
+  .alignright {
+  float: right;
+  margin-right: 10px;
+  }
+  </style>
 <script>
 $(document).ready(function() {
   $('#TFtable').DataTable( {
@@ -79,7 +82,7 @@ $(document).ready(function() {
                 "targets": 0,
                 "render": function( data, type, row ) {
                     if ('{{url_param[0]}}' != 'nolink') {
-                      data2 = '<a href="/api/1.0/' + '{{ url_param[0] }}/'+ row[{{ url_param[1] }}] + '{{ url_param[2] }}' + '">' + data+ '</a>';
+                      data2 = '<a href="/{{db}}/api/1.0/' + '{{ url_param[0] }}/'+ row[{{ url_param[1] }}] + '{{ url_param[2] }}' + '">' + data+ '</a>';
                     } else {
                       data2 = data;
                     }
@@ -91,7 +94,15 @@ $(document).ready(function() {
         </script>
 
   </head>
-  <p style="text-indent: 50px;"> <b>{{title}}</b></style></p>
+  <div>
+  <h5 style="text-indent: 50px;"> <b>{{title}}</b> </style>
+  <b class="alignright">
+  {% for breadcrumb in crumbs %}
+      <a href="{{ breadcrumb[0] }}">{{ breadcrumb[1] }}</a>
+      {{ '>' if not loop.last }}
+  {% endfor %}</b>
+</h5>
+  </div>
  <body>
 
 

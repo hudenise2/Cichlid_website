@@ -34,7 +34,7 @@ class EntryForm(FlaskForm):
     '''
     name = StringField('and / or provide individual name(s) or alias(es) (comma separated)')
     spname = StringField('and / or provide a species name or common name (partial name accepted)')
-    sname = StringField('and / or provide a sample name(s) or accession(s) (comma separated)')
+    sname = StringField('and / or provide sample name(s) or accession(s) (comma separated)')
     submit = SubmitField('Search database')
 
 class EnterDataForm(FlaskForm):

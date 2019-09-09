@@ -44,12 +44,24 @@
 	.TFtable tr:nth-child(even){
 		background: #f1f1f1;
 	}
+  .alignright {
+  float: right;
+  margin-right: 10px;
+  }
 </style>
 
 
 </head>
-  <p style="text-indent: 50px;"> <b>{{title}}</b></style></p>
-  <p> {{url_param}} </p>
+<div>
+<h5 style="text-indent: 50px;"> <b>{{title}}</b> </style>
+<b class="alignright">
+{% for breadcrumb in crumbs %}
+    <a href="{{ breadcrumb[0] }}">{{ breadcrumb[1] }}</a>
+    {{ '>' if not loop.last }}
+{% endfor %}</b>
+</h5>
+</div>
+
  <body>
    <table class="TFtable" id="TFtable" >
 

@@ -35,12 +35,12 @@
 <div align="right"><b>{{title}}</b></div>
 
 <body>
-    <form action="{{ url_for('enter_data') }}" method="post">
+    <form action="{{ url_for('enter_data', db=db) }}" method="post">
       {{ form.hidden_tag() }}
       <h3> If you want to add or update data to the cichlid database, <p style="margin-left: 40px">      you can download a template
             <label for="sel_temp" class="btn" style='font-size: 20px; font-style:italic; color: darkblue'>-here-</label>
             <input type="submit" id="sel_temp" style='display:none;' name="Download">, fill it,
-            <label for="upfiles" class="btn" style='font-size: 20px; font-style:italic; color: darkblue'  >-point to the filled file-</label>
+            <label for="upfiles" class="btn" style='font-size: 20px; font-style:italic; color: darkblue'  >-re-upload-</label>
             <input id="upfiles" type="file" name="Upload" style="display:none;">
             then click {{ form.submit() }} to upload </p>
       </h3>

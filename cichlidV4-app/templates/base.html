@@ -5,12 +5,14 @@
     </head>
     <body>
         <div>
-          <h1 style="text-align:center;"> DURBIN'S GROUP DATABASES:
-            <a href="{{ url_for('index') }}">Home</a>
+          <h1 style="text-align:center;">
+            <a href="{{ url_for('index') }}">DURBIN'S GROUP DATABASES</a>
           </h1>
+          {% if db %}
           <p style="text-align:right;font-size:150%;margin: 20px;">
-            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('login', db=db) }}">Login</a>
           </p>
+          {% endif %}
         </div>
        <hr>
         {% with messages = get_flashed_messages() %}
