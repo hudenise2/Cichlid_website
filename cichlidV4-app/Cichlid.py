@@ -19,7 +19,7 @@ app = Flask(__name__)
     Script still in progress with optimisation and code clean-up to be carried out
     Also upload of data need to be fully implemented
 '''
-
+#initialisation of connection
 config_file_path='./Cichlid_dbV4.json'       # for web version: '/www/hd2/www-dev/other-sites/darwin-tracking.sanger.ac.uk/cichlidV4-app/Cichlid_dbV4.json'
 configSettings = json.load(open(config_file_path, 'r'))
 app.config.from_object(Config)
@@ -41,9 +41,9 @@ migrate = Migrate(app, mysql)
 login = LoginManager(app)
 app.config.update(mail_settings)
 mail = Mail(app)
-#login.login_view = 'login'
+login.login_view = 'login'
 mail.init_app(app)
-#@login.user_loader
+
 def load_user(id):
     return query.get(int(id))
 
@@ -67,7 +67,7 @@ def verify_password(stored_password, provided_password):
     return pwdhash == stored_password
 
 def get_columns_from_table(table_name):
-    """extract the name of fields for a given table  extracted from the database"""
+    """extract the name of fields for a given table extracted from the information schema of the database"""
     col=[]
     curs = mysql.connection.cursor()
     try:
@@ -123,13 +123,13 @@ def change_for_display(col, data):
                             columns[field_index]= 'supplier_name'
                         else:
                             columns[field_index]= table+"_name"
-    #special case for location where several fields are returned
+    #special case for location: several fields are returned
     if 'location' in columns and columns[0]=='individual_id':
         columns.insert(columns.index('location'), 'country_of_origin')
         columns.insert(columns.index('location')+1, 'sub_location')
         columns.insert(columns.index('location')+2, 'latitude')
         columns.insert(columns.index('location')+3, 'longitude')
-    #special case for cv where two fields are returned
+    #special case for cv table as two fields are returned
     if 'cv_attribute' in columns:
         columns.insert(columns.index('cv_attribute')+1, 'cv_comment')
     #REPLACING THE 'table_id' VALUES BY THE NAMES/ATTRIBUTES VALUES
@@ -271,11 +271,39 @@ def add_data_to_tuple(old_tuple, new_data):
     new_list += old_list
     return tuple(new_list)
 
+def add_sample_info(col, data, curs):
+    """adding sample information if available to 'individual' display"""
+    new_col=()
+    new_data=[]
+    results=[]
+    all_results=[]
+    if len(data) > 0:
+        for row in data:
+            try:
+                curs.execute("SELECT s.* from sample s left join material m on m.material_id=s.material_id where s.latest=1 and m.individual_id = '{indi}';". format(indi=row[0]))
+                s_results=curs.fetchall()
+            except:
+                flash ("Error: unable to fetch sample information")
+            if len(s_results) > 0:
+                for s_result in s_results:
+                    new_col=col+tuple(["sample_name","sample_accession","sample_ssid"])
+                    new_data=list(row[1:7])+list(row[24:28])+[s_result[5], s_result[3], s_result[4]]+list(row[7:16])+list(row[18:21])
+            else:
+                new_col=col
+                new_data=list(row[1:7])+list(row[24:28])+list(row[7:16])+list(row[18:21])
+            #display data if latest=1
+            if row[15]==1:
+                results.append(new_data)
+            all_results.append(results)
+        if len(all_results) > len(results):
+            results=all_results
+    return new_col, results
+
 def transpose_table(col, data):
     """transpose data from horizontal display to vertical one"""
     new_data=[]
-    l=[]
-    nl=[]
+    list_of_index=[]
+    not_displayed_index_list=[] #not in use at this time but could be of interest
     #get the index from column list
     for index in range(1,len(col)):
         #get header
@@ -286,29 +314,33 @@ def transpose_table(col, data):
         #only keep info if there is data to display
         if new_list.count(None)!=len(data) and new_list.count('None')!=len(data) and new_list.count('')!=len(data):
             new_data.append(new_list)
-            l.append(index)
+            list_of_index.append(index)
         else:
-            nl.append(index)
+            not_displayed_index_list.append(index)
     index_col=[]
+    #function to add blank line separation in the vertical display (note: it works only if sample info is present)
     if col[0]=='individual_id':
-        if len([i for i in l if i>5 and i<10 ]) >0:
-            index_col.append(min([i for i in l if i>5 and i<10 ]))
-        if len([i for i in l if i>9 and i<15]) >0:
-            index_col.append(min([i for i in l if i>9 and i<15]))
-        if len([i for i in l if i>15 and i<19]) >0:
-            index_col.append(min([i for i in l if i>15 and i<19 ]))
-        if len([i for i in l if i>18 and i<23]) >0:
-            index_col.append(min([i for i in l if i>18 and i<23 ]))
-        if len([i for i in l if i>22 and i<28]) >0:
-            index_col.append(min([i for i in l if i>22 and i<28 ]))
-        if 15 in l:
-            index_col.append(15)
+        if len([i for i in list_of_index if i>5 and i<10 ]) >0:
+            index_col.append(min([i for i in list_of_index if i>5 and i<10 ]))
+        if len([i for i in list_of_index if i>9 and i<13]) >0:
+            index_col.append(min([i for i in list_of_index if i>9 and i<12]))
+        if len([i for i in list_of_index if i>12 and i<17]) >0:
+            index_col.append(min([i for i in list_of_index if i>12 and i<17 ]))
+        if len([i for i in list_of_index if i>18 and i<21]) >0:
+            index_col.append(min([i for i in list_of_index if i>18 and i<21 ]))
+        if len([i for i in list_of_index if i>22 and i<25]) >0:
+            index_col.append(min([i for i in list_of_index if i>22 and i<25 ]))
+        if len([i for i in list_of_index if i>25 and i<28]) >0:
+            index_col.append(min([i for i in list_of_index if i>25 and i<28 ]))
+        #to separate the provider_name
+        if 18 in list_of_index:
+            index_col.append(18)
     elif col[0]=='file_id':
-        if len([i for i in l if i>4 and i<10 ]) >0:
-            index_col.append(min([i for i in l if i>4 and i<10 ]))
-        if len([i for i in l if i>10 and i<13]) >0:
-            index_col.append(min([i for i in l if i>10 and i<13]))
-        if 10 in l:
+        if len([i for i in list_of_index if i>4 and i<10 ]) >0:
+            index_col.append(min([i for i in list_of_index if i>4 and i<10 ]))
+        if len([i for i in list_of_index if i>10 and i<13]) >0:
+            index_col.append(min([i for i in list_of_index if i>10 and i<13]))
+        if 10 in list_of_index:
             index_col.append(10)
     name_col=[col[x] for x in index_col]
     return new_data, name_col
@@ -325,10 +357,9 @@ def remove_column(original_tuple, col_idx):
     return (tuple(new_list))
 
 @app.route('/')
-
 @app.route('/index', methods=['GET', 'POST'])
 def index():
-    """main function for the main page where user can choose the way to interrogate the database"""
+    """main function for the main page where user can choose which database to interrogate"""
     project_acc=""
     individual_name=""
     flag=""
@@ -351,8 +382,7 @@ def index():
         elif details['db_choice']=='CICHLID_TRACKINGV4':
             config_file_path="./Cichlid_dbV4.json"
             db='cichlid'
-
-        # for web version: '/www/hd2/www-dev/other-sites/darwin-tracking.sanger.ac.uk/cichlidV4-app/Cichlid_dbV4.json'
+        # for web version: '/www/hd2/www-dev/other-sites/darwin-tracking.sanger.ac.uk/cichlidV4-app/XXXXXXX.json'
         configSettings = json.load(open(config_file_path, 'r'))
         app.config.from_object(Config)
         app.config['MYSQL_HOST'] = configSettings["MySQL_host"]
@@ -367,13 +397,7 @@ def index():
             "MAIL_USERNAME": configSettings["Mail_usrn"],
             "MAIL_PASSWORD": configSettings["Mail_pswd"]
         }
-        #mysql = MySQL(app)
         migrate = Migrate(app, mysql)
-        #login = LoginManager(app)
-        app.config.update(mail_settings)
-        mail = Mail(app)
-        #login.login_view = 'login'
-        mail.init_app(app)
         return redirect(url_for('db_index', db=db))
     return render_template("entry.html", title='Query was: returnall', form=form, db_list=tuple(list_db))
 
@@ -400,7 +424,7 @@ def db_index(db):
     except:
         flash ("Error: unable to fetch location information")
     curs.close()
-
+    #define menus to display to users
     for proj in prows:
         list_proj.append(proj[0]+" - " +proj[1])
     for loc in sorted(lrows):
@@ -657,17 +681,31 @@ def get_images(db):
 @app.route('/<db>/api/1.0/individual/', methods=['GET'])
 def get_individuals(db):
     icolumns=get_columns_from_table('individual')
-    columns=icolumns[1:7]
+    columns=icolumns[1:7]+tuple(['sample_name'])
+    sresults=()
+    all_results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM individual where latest=1")
-        results=curs.fetchall()
+        curs.execute("SELECT * from individual where latest=1")
+        iresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
+    #curs.close()
+    #result=remove_column(results, 1)
+    #for result in iresults:
+    results=[x[1:7] for x in list(iresults)]  #) for x in list(result)])
+    for result in results:
+        try:
+            curs.execute("SELECT m.individual_id, s.name from sample s left join material m on m.material_id=s.material_id where s.latest=1 and m.individual_id = '{indi}';". format(indi=result[0]))
+            sresults=curs.fetchall()
+            if len(sresults) == 0:
+                all_results.append(list(result) +[''])
+            else:
+                all_results.append(list(result)+ [sresults[0][1]])
+        except:
+            flash ("Error: unable to fetch sample information:" +str(result))
     curs.close()
-    result=remove_column(results, 1)
-    results=tuple([x[:6] for x in list(result)])
-    new_columns, display_results= change_for_display(columns, results)
+    new_columns, display_results= change_for_display(columns, all_results)
     crumbs=[[url_for('db_index', db=db), db]]
     session['breadcrumbs'] = crumbs
     session['query']=[url_for('get_individuals', db=db), 'individual']
@@ -678,61 +716,53 @@ def get_individuals(db):
 
 @app.route('/<db>/api/1.0/individual/<i_id>', methods=['GET'])
 def get_individual_per_individual_id(i_id, db):
-    columns=get_columns_from_table('individual')
+    i_columns=get_columns_from_table('individual')
     id_columns=get_columns_from_table('individual_data')
-    results=[]
-    all_results=[]
+    i_results=()
+    #all_results=[]
+    new_columns=()
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, id.*, p.name, p.alias, p.accession, p.ssid FROM individual i left join individual_data id on i.individual_id=id.individual_id join allocation a \
+        curs.execute("SELECT i.*, id.*, p.name, p.alias, p.accession, p.ssid FROM individual i left join individual_data id on i.individual_id=id.individual_id left join allocation a \
         on a.individual_id=i.individual_id left join project p on p.project_id=a.project_id where i.individual_id = '{identif}';". format(identif=i_id))
         i_results=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
-    curs.close()
-    for row in i_results:
-        i_results=list(row[1:7])+list(row[24:28])+list(row[7:16])+list(row[17:21])
-        if row[15]==1:
-            results.append(i_results)
-        all_results.append(i_results)
-    if len(results) > len(all_results):
-        results=all_results
-    new_column, display_results= change_for_display(columns[1:7]+tuple(["project_name","project_alias","project_accession","project_ssid"])+columns[7:]+id_columns[2:6], results)
+    columns=i_columns[1:7]+tuple(["project_name","project_alias","project_accession","project_ssid"])
+    new_columns, all_results=add_sample_info(columns, i_results, curs)
+    complete_columns=new_columns+i_columns[7:]+id_columns[2:6]
+    new_column, display_results= change_for_display(complete_columns, all_results)
     v_display_results, split_col=transpose_table(list(new_column), display_results)
     crumbs=session.get('breadcrumbs', None)
     list_crumbs=[x[-1] for x in crumbs]
     if 'individuals' not in list_crumbs and len(session.get('query', None)) > 0:
         crumbs.append(session.get('query', None))
-    return render_template("mysqlV.html", title='Query was: individual = "' + str(results[0][1]) +'"', view_param=split_col, results=[v_display_results], db=db, crumbs=crumbs)
+    return render_template("mysqlV.html", title='Query was: individual = "' + str(all_results[0][1]) +'"', view_param=split_col, results=[v_display_results], db=db, crumbs=crumbs)
 
 @app.route('/<db>/api/1.0/individual/<ind_name>/', methods=['GET'])
 def get_individual_per_individual_name(ind_name, db):
     ind_list=ind_name.replace(" ","").replace(",", "','")
-    columns=get_columns_from_table('individual')
+    i_columns=get_columns_from_table('individual')
     id_columns=get_columns_from_table('individual_data')
     results=[]
     all_results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, id.*, p.name, p.alias, p.accession, p.ssid FROM individual i left join individual_data id on i.individual_id=id.individual_id join allocation a \
+        curs.execute("SELECT i.*, id.*, p.name, p.alias, p.accession, p.ssid FROM individual i left join individual_data id on i.individual_id=id.individual_id left join allocation a \
         on a.individual_id=i.individual_id left join project p on p.project_id=a.project_id where i.name in ('{identif}') or i.alias in ('{identif}') ". format(identif=ind_list))
-        iresults=curs.fetchall()
+        i_results=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
-    curs.close()
-    if len(iresults) > 0:
-        for row in iresults:
-            i_results=list(row[1:7])+list(row[24:28])+list(row[7:16])+list(row[17:21])
-            if row[15] ==1:
-                results.append(i_results)
-            all_results.append(i_results)
-        if len(all_results) > len(results):
-            results=all_results
-        new_columns, display_results= change_for_display(columns[1:7]+tuple(["project_name","project_alias","project_accession","project_ssid"])+columns[7:]+id_columns[2:6], results)
-        v_display_results, split_col=transpose_table(new_columns, display_results)
+    if len(i_results) > 0:
+        columns=i_columns[1:7]+tuple(["project_name","project_alias","project_accession","project_ssid"])
+        new_columns, all_results=add_sample_info(columns, i_results, curs)
+        complete_columns=new_columns+i_columns[7:]+id_columns[2:6]
+        new_column, display_results= change_for_display(complete_columns, all_results)
+        v_display_results, split_col=transpose_table(list(new_column), display_results)
     else:
         flash("unable to fetch the individual(s)")
         return redirect(url_for('db_index', db=db))
+    curs.close()
     crumbs=[[url_for('db_index', db=db), db]]
     list_crumbs=[x[-1] for x in crumbs]
     if 'individual' not in list_crumbs and len(session.get('query', None)) > 0:
