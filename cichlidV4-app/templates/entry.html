@@ -49,20 +49,31 @@ div.a {
 .show {display: block;}
 
 </style>
+<head>
+  <title>Welcome to the Durbin's group database</title>
+  <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" media="screen">
+
+<body>
+    <div  margin-left: 100px>
+      <h3 style="text-align:right;font-size:150%;margin: 20px;"> Selected database:
+        <a style="font-size:120%;">{{db}}</a>
+      </h3>
+    </div>
+  </head>
 <body>
   <div class="a">
 <div class="dropdown" name='dropdown'>
   <button onclick="myFunction()" class="dropbtn">Select a table</button>
   <div id="myDropdown" class="dropdown-content">
-    <a href="{{ url_for('get_images') }}">Images</a>
-    <a href="{{ url_for('get_individuals') }}">Individual</a>
-    <a href="{{ url_for('get_lanes') }}">Lane</a>
-    <a href="{{ url_for('get_location') }}">Location</a>
-    <a href="{{ url_for('get_material') }}">Material</a>
-    <a href="{{ url_for('get_projects') }}">Project</a>
-    <a href="{{ url_for('get_provider') }}">Provider</a>
-    <a href="{{ url_for('get_samples') }}">Sample</a>
-    <a href="{{ url_for('get_species') }}">Species</a>
+    <a href="{{ url_for('get_images', db=db) }}">Images</a>
+    <a href="{{ url_for('get_individuals', db=db) }}">Individual</a>
+    <a href="{{ url_for('get_lanes', db=db) }}">Lane</a>
+    <a href="{{ url_for('get_location', db=db) }}">Location</a>
+    <a href="{{ url_for('get_material', db=db) }}">Material</a>
+    <a href="{{ url_for('get_projects', db=db ) }}">Project</a>
+    <a href="{{ url_for('get_provider', db=db) }}">Provider</a>
+    <a href="{{ url_for('get_samples', db=db) }}">Sample</a>
+    <a href="{{ url_for('get_species', db=db) }}">Species</a>
   </div>
 </div>
 
