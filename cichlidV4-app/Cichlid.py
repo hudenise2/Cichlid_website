@@ -397,7 +397,7 @@ def index():
             "MAIL_USERNAME": configSettings["Mail_usrn"],
             "MAIL_PASSWORD": configSettings["Mail_pswd"]
         }
-        migrate = Migrate(app, mysql)
+        print(db)
         return redirect(url_for('db_index', db=db))
     return render_template("entry2.html", title='Query was: returnall', form=form, db_list=tuple(list_db))
 
@@ -510,7 +510,7 @@ def db_index(db):
         else:
             return redirect(url_for('db_index', db=db))
             flash("Please enter valid criteria")
-    return render_template("entry2.html", title='Query was: returnall', form=form, project_list=tuple(list_proj), loc_list=tuple(list_loc), db=db)
+    return render_template("entry.html", title='Query was: returnall', form=form, project_list=tuple(list_proj), loc_list=tuple(list_loc), db=db)
 
 @app.route('/<db>/login/', methods=['GET', 'POST'])
 def login(db):
