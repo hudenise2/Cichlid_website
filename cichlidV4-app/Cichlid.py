@@ -399,7 +399,7 @@ def index():
         }
         migrate = Migrate(app, mysql)
         return redirect(url_for('db_index', db=db))
-    return render_template("entry.html", title='Query was: returnall', form=form, db_list=tuple(list_db))
+    return render_template("entry2.html", title='Query was: returnall', form=form, db_list=tuple(list_db))
 
 @app.route('/<db>', methods=['GET', 'POST'])
 def db_index(db):
