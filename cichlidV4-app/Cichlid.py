@@ -295,7 +295,7 @@ def add_sample_info(col, data, curs):
     new_data=data
     if len(data) > 0:
         try:
-            curs.execute("SELECT s.* from sample s left join material m on m.material_id=s.material_id where s.latest=1 and m.individual_id = '{indi}';". format(indi=data[0]))
+            curs.execute("SELECT distinct s.* from sample s left join material m on m.material_id=s.material_id where s.latest=1 and m.individual_id = '{indi}';". format(indi=data[0]))
             s_results=curs.fetchall()
         except:
             flash ("Error: unable to fetch sample information")
@@ -303,6 +303,26 @@ def add_sample_info(col, data, curs):
             for s_result in s_results:
                 new_col+=tuple(["sample_name","sample_accession","sample_ssid"])
                 new_data+=tuple([s_result[5], s_result[3], s_result[4]])
+    return new_col, tuple(new_data)
+
+def add_individual_data_info(col, data, curs):
+    """adding individual_data information if available to 'individual' display"""
+    new_col=()
+    new_data=[]
+    id_results=()
+    all_results=[]
+    new_col=col
+    new_data=data[0]
+    if len(data) > 0:
+        try:
+            curs.execute("SELECT distinct * from individual_data where latest=1 and individual_id = '{indi}';". format(indi=data[0][0]))
+            id_results=curs.fetchall()
+        except:
+            flash ("Error: unable to fetch individual_data information")
+        if len(id_results) > 0:
+            for id_result in id_results:
+                new_col+=tuple(["cv_id","value","unit", "comment"])
+                new_data+=list(id_result[2:6])
     return new_col, tuple(new_data)
 
 def transpose_table(col, data):
@@ -328,7 +348,7 @@ def transpose_table(col, data):
     #function to add blank line separation in the vertical display (note: it works only if sample info is present; need to be changed)
     for index in list_of_index:
         if col[0]=='individual_id':
-            if col[index] in ('project_name', 'sample_name', 'country_of_origin', 'provider_name', 'date_collected', 'father_name', 'changed', 'thumbnail'):
+            if col[index] in ('project_name', 'sample_name', 'country_of_origin', 'provider_name', 'date_collected', 'father_name', 'changed', 'thumbnail', 'cv_attribute'):
                 index_col.append(index)
         elif col[0]=='file_id':
             if col[index] in ('file_type', 'md5', 'location', 'changed'):
@@ -590,7 +610,7 @@ def enter_data(db):
     provider_list=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT provider_name FROM provider")
+        curs.execute("SELECT distinct provider_name FROM provider")
         provider_res=curs.fetchall()
     except:
         flash ("Error: unable to fetch provider names")
@@ -636,7 +656,7 @@ def get_files_per_lane_id(la_id, db):
     columns=tuple([lcolumns[1]]+[lcolumns[3]]+[lcolumns[2]]+list(lcolumns[4:]))
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT f.*, l.accession FROM file f join lane l on f.lane_id=l.lane_id where f.latest=1 and f.lane_id = '%s';" % la_id)
+        curs.execute("SELECT distinct f.*, l.accession FROM file f join lane l on f.lane_id=l.lane_id where f.latest=1 and f.lane_id = '%s';" % la_id)
         fresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch files")
@@ -697,7 +717,7 @@ def get_individuals(db):
     results=[x[1:7] for x in list(iresults)]  #) for x in list(result)])
     for result in results:
         try:
-            curs.execute("SELECT m.individual_id, s.name from sample s left join material m on m.material_id=s.material_id where s.latest=1 and m.individual_id = '{indi}';". format(indi=result[0]))
+            curs.execute("SELECT distinct m.individual_id, s.name from sample s left join material m on m.material_id=s.material_id where s.latest=1 and m.individual_id = '{indi}';". format(indi=result[0]))
             sresults=curs.fetchall()
             if len(sresults) == 0:
                 all_results.append(list(result) +[''])
@@ -731,8 +751,9 @@ def get_individual_per_individual_id(i_id, db):
         flash ("Error: unable to fetch individuals")
     columns, results=add_project_info(i_columns[1:7], i_results)
     new_columns, s_results=add_sample_info(columns, results, curs)
-    complete_columns=new_columns+i_columns[7:]#+id_columns[2:6]
+    updated_columns=new_columns+i_columns[7:]
     all_results.append(list(s_results+i_results[0][7:16]))
+    complete_columns, updated_results=add_individual_data_info(updated_columns, all_results, curs)
     new_column, display_results= change_for_display(complete_columns, tuple(all_results))
     v_display_results, split_col=transpose_table(list(new_column), display_results)
     crumbs=session.get('breadcrumbs', None)
@@ -741,6 +762,7 @@ def get_individual_per_individual_id(i_id, db):
         crumbs.append(session.get('query', None))
     else:
         crumbs.pop()
+    session['breadcrumbs'] = crumbs
     session['query']=[url_for('get_individual_per_individual_id', i_id=i_id, db=db), 'individual']
     return render_template("mysqlV.html", title='Query was: individual = "' + str(all_results[0][1]) +'"', view_param=split_col, results=[v_display_results], db=db, crumbs=crumbs)
 
@@ -753,16 +775,16 @@ def get_individual_per_individual_name(ind_name, db):
     all_results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, id.*, p.name, p.alias, p.accession, p.ssid FROM individual i left join individual_data id on i.individual_id=id.individual_id left join allocation a \
+        curs.execute("SELECT distinct i.*, p.name, p.alias, p.accession, p.ssid FROM individual i left join allocation a \
         on a.individual_id=i.individual_id left join project p on p.project_id=a.project_id where i.name in ('{identif}') or i.alias in ('{identif}') ". format(identif=ind_list))
         i_results=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
     columns, results=add_project_info(i_columns[1:7], i_results)
     new_columns, s_results=add_sample_info(columns, results, curs)
-    curs.close()
-    complete_columns=new_columns+i_columns[7:]#+id_columns[2:6]
+    updated_columns=new_columns+i_columns[7:]
     all_results.append(list(s_results+i_results[0][7:16]))
+    complete_columns, updated_results=add_individual_data_info(updated_columns, all_results, curs)
     new_column, display_results= change_for_display(complete_columns, tuple(all_results))
     v_display_results, split_col=transpose_table(list(new_column), display_results)
     crumbs=session.get('breadcrumbs', None)
@@ -787,7 +809,7 @@ def get_individual_per_name_and_species_name(ind_name, sp_name, db):
     columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.* FROM individual i join species s on i.species_id=s.species_id WHERE (s.name like '%%{spn}%%' or s.common_name like '%%{spn}%%') and (i.name in ('{i_l}') or i.alias in ('{i_l}'));". format(spn=sp_name, i_l=ind_list))
+        curs.execute("SELECT distinct i.* FROM individual i join species s on i.species_id=s.species_id WHERE (s.name like '%%{spn}%%' or s.common_name like '%%{spn}%%') and (i.name in ('{i_l}') or i.alias in ('{i_l}'));". format(spn=sp_name, i_l=ind_list))
         res=curs.fetchall()
     except:
         flash ("Error: unable to fetch items")
@@ -835,7 +857,7 @@ def get_lanes_per_sample_id(spl_id, db):
     columns=tuple([lcolumns[1]]+[lcolumns[7]]+[lcolumns[6]]+list(lcolumns[3:6])+list(lcolumns[8:]))
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT l.*, s.name FROM lane l join sample s on s.sample_id=l.sample_id where l.latest=1 and l.sample_id = '%s';" % spl_id)
+        curs.execute("SELECT distinct l.*, s.name FROM lane l join sample s on s.sample_id=l.sample_id where l.latest=1 and l.sample_id = '%s';" % spl_id)
         lresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch lanes")
@@ -883,7 +905,7 @@ def get_individual_per_location_id(loc_id, db):
     results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, l.location, l.sub_location FROM individual i join location l on i.location_id=l.location_id where l.location_id = '%s' and i.latest=1;" % loc_id)
+        curs.execute("SELECT distinct i.*, l.location, l.sub_location FROM individual i join location l on i.location_id=l.location_id where l.location_id = '%s' and i.latest=1;" % loc_id)
         res=curs.fetchall()
         iresults=remove_column(res, 1)
     except:
@@ -911,8 +933,8 @@ def get_individual_per_location(location, db):
     loc_columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT I.* FROM individual I join location L on L.location_id = I.location_id \
-        where I.latest=1 and L.location = '%s';" % location)
+        curs.execute("SELECT distinct i.* FROM individual i join location l on l.location_id = i.location_id \
+        where i.latest=1 and l.location = '%s';" % location)
         res=curs.fetchall()
     except:
         flash ("Error: unable to fetch location")
@@ -935,7 +957,7 @@ def get_individual_per_name_and_per_location(location, ind_name, db):
     ind_list=ind_name.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT I.* FROM individual I join location L on L.location_id = I.location_id \
+        curs.execute("SELECT distinct I.* FROM individual I join location L on L.location_id = I.location_id \
         join species S on S.species_id = I.species_id where L.location = '{reg}' and (I.name in ('{indl}') or I.alias in ('{indl}')) ;". format(reg=location, indl=ind_list))
         res=curs.fetchall()
     except:
@@ -953,7 +975,7 @@ def get_species_per_name_and_per_location(location, sp_name, db):
     loc_columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT I.* FROM individual I join location L on L.location_id = I.location_id \
+        curs.execute("SELECT distinct I.* FROM individual I join location L on L.location_id = I.location_id \
         join species S on S.species_id = I.species_id where I.latest=1 and L.location = '{reg}' and (S.name like '%%{spn}%%' or S.common_name like '%%{spn}%%');". format(reg=location, spn=sp_name))
         res=curs.fetchall()
     except:
@@ -972,7 +994,7 @@ def get_material(db):
     columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[12]])+scolumns[5:12]+scolumns[13:]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT material_id, name, individual_id, accession, developmental_stage_id, provider_id, date_received, \
+        curs.execute("SELECT distinct material_id, name, individual_id, accession, developmental_stage_id, provider_id, date_received, \
         storage_condition, storage_location, type, volume, concentration, organism_part_id, changed, \
         latest FROM material where latest=1")
         results=curs.fetchall()
@@ -1006,7 +1028,7 @@ def get_project_per_accession(accession, db):
     columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
+        curs.execute("SELECT distinct * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
         where p.project_id  = a.project_id and p.accession = '%s') and latest=1;" % accession)
         results=curs.fetchall()
     except:
@@ -1058,7 +1080,7 @@ def get_project_per_accession_and_location(accession, location, db):
     columns=loc_columns[1:8]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT I.* FROM individual I join location L on L.location_id = I.location_id \
+        curs.execute("SELECT distinct I.* FROM individual I join location L on L.location_id = I.location_id \
         join species S on S.species_id = I.species_id \
         left outer join allocation A on A.individual_id=I.individual_id \
         left outer join project P on P.project_id=A.project_id \
@@ -1081,7 +1103,7 @@ def get_individual_per_project_accession_and_species(accession, sp_name, db):
     columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
+        curs.execute("SELECT distinct * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
         where p.project_id  = a.project_id and p.accession = '{acc}') and species_id in (select species_id from species where \
          name like '%%{spn}%%' or common_name like '%%{spn}%%') and latest=1;". format(acc=accession, spn=sp_name))
         result=curs.fetchall()
@@ -1118,7 +1140,7 @@ def get_individual_by_provider(p_id, db):
     columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, p.provider_name FROM individual i right join provider p on p.provider_id=i.provider_id where i.latest=1 and p.provider_id ='%s';" % p_id)
+        curs.execute("SELECT distinct i.*, p.provider_name FROM individual i right join provider p on p.provider_id=i.provider_id where i.latest=1 and p.provider_id ='%s';" % p_id)
         result=curs.fetchall()
     except:
         flash ("Error: unable to fetch individual")
@@ -1152,7 +1174,7 @@ def get_samples(db):
         flash ("Error: unable to fetch samples")
     for row in sresults:
         try:
-            curs.execute("SELECT i.individual_id from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s' ;" % row[2])
+            curs.execute("SELECT distinct i.individual_id from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s' ;" % row[2])
             id_return=curs.fetchall()
         except:
             flash ("Error: unable to fetch items")
@@ -1175,14 +1197,14 @@ def get_samples_per_material_name(m_id, db):
     columns=tuple(updated_col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM sample where material_id = '%s' ;" % m_id)
+        curs.execute("SELECT distinct * FROM sample where material_id = '%s' ;" % m_id)
         sresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch samples")
     if len(sresults) > 0:
         for row in sresults:
             try:
-                curs.execute("SELECT i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
+                curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
                 id_return=curs.fetchall()
             except:
                 flash ("Error: unable to fetch items")
@@ -1215,14 +1237,14 @@ def get_samples_by_name(sname, db):
     columns=tuple(updated_col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM sample where latest=1 and name in ('{slist}') or accession in ('{slist}');".format(slist=s_list))
+        curs.execute("SELECT distinct * FROM sample where latest=1 and name in ('{slist}') or accession in ('{slist}');".format(slist=s_list))
         sresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch samples")
     if len(sresults) > 0:
         for row in sresults:
             try:
-                curs.execute("SELECT i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
+                curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
                 id_return=curs.fetchall()
             except:
                 flash ("Error: unable to fetch items")
@@ -1251,7 +1273,7 @@ def get_samples_by_sample_name_and_individual_name(sname, ind_name, db):
     columns=tuple(updated_col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("select s.* from sample s join material m on m.material_id = s.material_id join individual i on i.individual_id=m.individual_id where s.latest=1 and (i.name in ('{ind_list}') \
+        curs.execute("select distinct s.* from sample s join material m on m.material_id = s.material_id join individual i on i.individual_id=m.individual_id where s.latest=1 and (i.name in ('{ind_list}') \
          or i.alias in ('{ind_list}')) and (s.accession in ('{s_list}') or s.name in ('{s_list}'));".format(ind_list=ind_list, s_list=s_list))
         sresults=curs.fetchall()
     except:
@@ -1259,7 +1281,7 @@ def get_samples_by_sample_name_and_individual_name(sname, ind_name, db):
     if len(sresults) > 0:
         for row in sresults:
             try:
-                curs.execute("SELECT i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
+                curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
                 id_return=curs.fetchall()
             except:
                 flash ("Error: unable to fetch items")
@@ -1286,7 +1308,7 @@ def get_samples_by_sample_name_and_location(sname, location, db):
     columns=tuple(updated_col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("select s.* from sample s join material m on m.material_id = s.material_id join individual i \
+        curs.execute("select distinct s.* from sample s join material m on m.material_id = s.material_id join individual i \
         on i.individual_id=m.individual_id left join location l on l.location_id=i.location_id where s.latest=1 \
         and (s.accession in ('{s_list}') or s.name in ('{s_list}')) and l.location='{loc}';".format(loc=location, s_list=s_list))
         sresults=curs.fetchall()
@@ -1295,7 +1317,7 @@ def get_samples_by_sample_name_and_location(sname, location, db):
     if len(sresults) > 0:
         for row in sresults:
             try:
-                curs.execute("SELECT i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
+                curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
                 id_return=curs.fetchall()
             except:
                 flash ("Error: unable to fetch items")
@@ -1322,7 +1344,7 @@ def get_samples_by_sample_name_and_project(sname, accession, db):
     columns=tuple(updated_col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("select s.* from sample s join material m on m.material_id = s.material_id join individual i \
+        curs.execute("select distinct s.* from sample s join material m on m.material_id = s.material_id join individual i \
     on i.individual_id=m.individual_id left join allocation a on a.individual_id=i.individual_id join project p \
     on p.project_id=a.project_id where s.latest=1 and (s.accession in ('{s_list}') or s.name in ('{s_list}')) \
     and p.accession='{acc}';".format(acc=accession, s_list=s_list))
@@ -1332,7 +1354,7 @@ def get_samples_by_sample_name_and_project(sname, accession, db):
     if len(sresults) > 0:
         for row in sresults:
             try:
-                curs.execute("SELECT i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
+                curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
                 id_return=curs.fetchall()
             except:
                 flash ("Error: unable to fetch items")
@@ -1360,7 +1382,7 @@ def get_samples_by_sample_name_and_species(sname, sp_name, db):
     columns=tuple(updated_col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("select s.* from sample s join material m on m.material_id = s.material_id join individual i \
+        curs.execute("select distinct s.* from sample s join material m on m.material_id = s.material_id join individual i \
         on i.individual_id=m.individual_id left join species sp on sp.species_id=i.species_id where s.latest=1 \
         and (s.accession in ('{s_list}') or s.name in ('{s_list}')) and (sp.name like '%{spn}%' or sp.common_name like '%{spn}%');".format(spn=sp_name, s_list=s_list))
         sresults=curs.fetchall()
@@ -1369,7 +1391,7 @@ def get_samples_by_sample_name_and_species(sname, sp_name, db):
     if len(sresults) > 0:
         for row in sresults:
             try:
-                curs.execute("SELECT i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
+                curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
                 id_return=curs.fetchall()
             except:
                 flash ("Error: unable to fetch items")
@@ -1409,7 +1431,7 @@ def get_individual_per_species_id(sp_id, db):
     results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, s.name FROM individual i join species s on i.species_id=s.species_id where i.latest=1 and s.species_id = '%s';" % sp_id)
+        curs.execute("SELECT distinct i.*, s.name FROM individual i join species s on i.species_id=s.species_id where i.latest=1 and s.species_id = '%s';" % sp_id)
         sresults=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
@@ -1458,7 +1480,7 @@ def get_individual_per_tax_id(tax_id, db):
     columns=scolumns[1:]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.* FROM individual i join species s on s.species_id=i.species_id where s.taxon_id = '%s' and i.latest=1" % tax_id)
+        curs.execute("SELECT distinct i.* FROM individual i join species s on s.species_id=i.species_id where s.taxon_id = '%s' and i.latest=1" % tax_id)
         results=curs.fetchall()
     except:
         flash ("Error: unable to fetch species")
