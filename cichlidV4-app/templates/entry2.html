@@ -2,6 +2,8 @@
 
 {% block content %}
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<META HTTP-EQUIV="CACHE-CONTROL" CONTENT="NO-CACHE">
+<META HTTP-EQUIV="EXPIRES" CONTENT="0">
 <style>
 div.a {
   margin-left: 10px;
@@ -58,7 +60,7 @@ div.a {
     {{ form.csrf }}
       {{ form.hidden_tag() }}
         <p>
-          <select name= db_choice method="GET" action="/" style="width:320px;height:60px;margin-left:50px;background-color:white;font-size: 25px;color:#007bff; font-weight:bold;">
+          <select name= db_choice method="GET" action="/" style="width:320px;height:60px;margin-left:50px;background-color:white;font-size: 20px;color:#007bff; font-weight:bold;">
 	              {% for db in db_list %}
 	                <option value= "{{db}}" SELECTED>{{db}}</option>"
 	              {% endfor %}
