@@ -53,20 +53,18 @@ div.a {
   <title>Welcome to the Durbin's group database</title>
   <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" media="screen">
   </head>
-</head>
 <body>
-  {{db_list}}
   <form action="" method="post" novalidate autocomplete="off">
     {{ form.csrf }}
       {{ form.hidden_tag() }}
         <p>
-          <select name= db_choice method="GET" action="/" style="width:330px">
+          <select name= db_choice method="GET" action="/" style="width:320px;height:60px;margin-left:50px;background-color:white;font-size: 25px;color:#007bff; font-weight:bold;">
 	              {% for db in db_list %}
 	                <option value= "{{db}}" SELECTED>{{db}}</option>"
 	              {% endfor %}
 	            </select>
         </p>
-      <p style="margin-left: 10px">{{ form.submit() }}</p>
+      <p style="width:330px;margin-left:125px;border:none;background-color:white;font-size: 20px;color:blue; font-weight:bold;">{{ form.submit() }}</p>
   </body>
 
   </form>

@@ -1,6 +1,7 @@
 {% extends "baseLog.html" %}
 
 {% block content %}
+
 <script src="https://code.jquery.com/jquery-3.3.1.js"></script>
 
 
@@ -15,10 +16,8 @@
     <style>
     .option-heading:before           { content: "\25BA"; }
     .option-heading.is-active:before { content: "\25BC"; }
-
     /* Helpers */
     .is-hidden { content: "\25BC"; display: none;
-
     .btn {
     display: inline-block;
     margin: 0;
@@ -32,9 +31,17 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<div align="right"><b>{{title}}</b></div>
 
+<head>
+  <title>Welcome to the Durbin's group database</title>
+      <div  margin-left: 100px>
+      <h3 style="text-align:right;font-size:150%;margin: 20px;"> Selected database:
+        <a style="font-size:120%;">{{db}}</a>
+      </h3>
+    </div>
+  </head>
 <body>
+
     <form action="{{ url_for('enter_data', db=db) }}" method="post">
       {{ form.hidden_tag() }}
       <h3> If you want to add or update data to the cichlid database, <p style="margin-left: 40px">      you can download a template
@@ -42,7 +49,7 @@
             <input type="submit" id="sel_temp" style='display:none;' name="Download">, fill it,
             <label for="upfiles" class="btn" style='font-size: 20px; font-style:italic; color: darkblue'  >-re-upload-</label>
             <input id="upfiles" type="file" name="Upload" style="display:none;">
-            then click {{ form.submit() }} to upload </p>
+            then click <input type="submit" value="Submit" style="border:none;background-color:white;font-size: 20px;color:darkblue; font-weight:bold;" > to upload </p>
       </h3>
         <h3 style="margin-left: 40px" >or fill this form:</h3>
 
@@ -218,10 +225,13 @@
       </fieldset>
       <p></p>
       <center>
-         {{ form.submit() }}
+         <input type="submit" value="Submit form" style="border:none;background-color:white;font-size: 20px;color:darkblue; font-weight:bold;" >
        </center>
 
     </form>
+
       </body>
+
+
 
 {% endblock %}

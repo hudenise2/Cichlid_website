@@ -8,7 +8,17 @@ div.a {
   margin-left: 10px;
 }
 </style>
-
+<head>
+  <div>
+  <title>Welcome to the Durbin's group database</title>
+  <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" media="screen">
+</div>
+    <div  margin-left: 100px>
+      <h3 style="text-align:right;font-size:150%;margin: 20px;"> Selected database:
+        <a style="font-size:120%;">{{db}}</a>
+      </h3>
+    </div>
+  </head>
 <body>
 <div class="a">
     <h1>Sign In</h1>
@@ -31,7 +41,7 @@ div.a {
         <p>{{ form.remember_me() }} {{ form.remember_me.label }}</p>
         <p>{{ form.submit() }}</p>
     </form>
-    <p>New User? <a href="{{ url_for('register') }}">Click to Register!</a></p>
+    <p>New User? <a href="{{ url_for('register', db=db) }}">Click to Register!</a></p>
   </div>
 </body>
 {% endblock %}

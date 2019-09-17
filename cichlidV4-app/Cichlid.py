@@ -271,38 +271,45 @@ def add_data_to_tuple(old_tuple, new_data):
     new_list += old_list
     return tuple(new_list)
 
+def add_project_info(col, data):
+    """adding project information if available to 'individual' display"""
+    new_col=()
+    results=[]
+    all_results=[]
+    new_data=[]
+    new_data=tuple(data[0][1:7])
+    new_col=col
+    if len(data) > 0:
+        for row in data:
+            new_col+=tuple(["project_name","project_alias","project_accession", "project_ssid"])
+            new_data+=row[16:20]
+    return new_col, tuple(new_data,)
+
 def add_sample_info(col, data, curs):
     """adding sample information if available to 'individual' display"""
     new_col=()
     new_data=[]
-    results=[]
+    s_results=()
     all_results=[]
+    new_col=col
+    new_data=data
     if len(data) > 0:
-        for row in data:
-            try:
-                curs.execute("SELECT s.* from sample s left join material m on m.material_id=s.material_id where s.latest=1 and m.individual_id = '{indi}';". format(indi=row[0]))
-                s_results=curs.fetchall()
-            except:
-                flash ("Error: unable to fetch sample information")
-            if len(s_results) > 0:
-                for s_result in s_results:
-                    new_col=col+tuple(["sample_name","sample_accession","sample_ssid"])
-                    new_data=list(row[1:7])+list(row[24:28])+[s_result[5], s_result[3], s_result[4]]+list(row[7:16])+list(row[18:21])
-            else:
-                new_col=col
-                new_data=list(row[1:7])+list(row[24:28])+list(row[7:16])+list(row[18:21])
-            #display data if latest=1
-            if row[15]==1:
-                results.append(new_data)
-            all_results.append(results)
-        if len(all_results) > len(results):
-            results=all_results
-    return new_col, results
+        try:
+            curs.execute("SELECT s.* from sample s left join material m on m.material_id=s.material_id where s.latest=1 and m.individual_id = '{indi}';". format(indi=data[0]))
+            s_results=curs.fetchall()
+        except:
+            flash ("Error: unable to fetch sample information")
+        if len(s_results) > 0:
+            for s_result in s_results:
+                new_col+=tuple(["sample_name","sample_accession","sample_ssid"])
+                new_data+=tuple([s_result[5], s_result[3], s_result[4]])
+    return new_col, tuple(new_data)
 
 def transpose_table(col, data):
     """transpose data from horizontal display to vertical one"""
     new_data=[]
     list_of_index=[]
+    index_col=[]
     not_displayed_index_list=[] #not in use at this time but could be of interest
     #get the index from column list
     for index in range(1,len(col)):
@@ -317,31 +324,15 @@ def transpose_table(col, data):
             list_of_index.append(index)
         else:
             not_displayed_index_list.append(index)
-    index_col=[]
-    #function to add blank line separation in the vertical display (note: it works only if sample info is present)
-    if col[0]=='individual_id':
-        if len([i for i in list_of_index if i>5 and i<10 ]) >0:
-            index_col.append(min([i for i in list_of_index if i>5 and i<10 ]))
-        if len([i for i in list_of_index if i>9 and i<13]) >0:
-            index_col.append(min([i for i in list_of_index if i>9 and i<12]))
-        if len([i for i in list_of_index if i>12 and i<17]) >0:
-            index_col.append(min([i for i in list_of_index if i>12 and i<17 ]))
-        if len([i for i in list_of_index if i>18 and i<21]) >0:
-            index_col.append(min([i for i in list_of_index if i>18 and i<21 ]))
-        if len([i for i in list_of_index if i>22 and i<25]) >0:
-            index_col.append(min([i for i in list_of_index if i>22 and i<25 ]))
-        if len([i for i in list_of_index if i>25 and i<28]) >0:
-            index_col.append(min([i for i in list_of_index if i>25 and i<28 ]))
-        #to separate the provider_name
-        if 18 in list_of_index:
-            index_col.append(18)
-    elif col[0]=='file_id':
-        if len([i for i in list_of_index if i>4 and i<10 ]) >0:
-            index_col.append(min([i for i in list_of_index if i>4 and i<10 ]))
-        if len([i for i in list_of_index if i>10 and i<13]) >0:
-            index_col.append(min([i for i in list_of_index if i>10 and i<13]))
-        if 10 in list_of_index:
-            index_col.append(10)
+
+    #function to add blank line separation in the vertical display (note: it works only if sample info is present; need to be changed)
+    for index in list_of_index:
+        if col[0]=='individual_id':
+            if col[index] in ('project_name', 'sample_name', 'country_of_origin', 'provider_name', 'date_collected', 'father_name', 'changed', 'thumbnail'):
+                index_col.append(index)
+        elif col[0]=='file_id':
+            if col[index] in ('file_type', 'md5', 'location', 'changed'):
+                index_col.append(index)
     name_col=[col[x] for x in index_col]
     return new_data, name_col
 
@@ -367,13 +358,11 @@ def index():
     list_loc =[]
     if 'usrname' not in session:
         session['usrname']=""
-    session['query']=[]
-    session['html']=""
     list_db = ['CICHLID_TRACKINGV4','DARWIN_TRACKINGV1','-- select --']
     form=DatabaseForm()
     if form.validate_on_submit():
         details=request.form
-        if details['db_choice'][:1]=='--':
+        if details['db_choice'][:2]=='--':
             flash("Please select a database")
             return redirect(url_for('index'))
         elif details['db_choice']=='DARWIN_TRACKINGV1':
@@ -397,7 +386,7 @@ def index():
             "MAIL_USERNAME": configSettings["Mail_usrn"],
             "MAIL_PASSWORD": configSettings["Mail_pswd"]
         }
-        print(db)
+        session['query']=[]
         return redirect(url_for('db_index', db=db))
     return render_template("entry2.html", title='Query was: returnall', form=form, db_list=tuple(list_db))
 
@@ -411,7 +400,6 @@ def db_index(db):
     list_loc =[]
     if 'usrname' not in session:
         session['usrname']=""
-    session['html']=""
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT accession, name FROM project")
@@ -547,7 +535,9 @@ def login(db):
 def logout(db):
     """function to logout"""
     logout_user()
-    session['usrname']=""
+    session={}
+    crumbs=[[url_for('db_index', db=db), db]]
+    session['breadcrumbs'] = crumbs
     return redirect(url_for('db_index', db=db))
 
 @app.route('/<db>/register/', methods=['GET', 'POST'])
@@ -558,25 +548,35 @@ def register(db):
         if request.method == "POST" and form.validate():
             username  = form.username.data
             email = form.email.data
-            password = hash_password(form.password.data)
-            curs = mysql.connection.cursor()
-            x = curs.execute("SELECT * FROM users WHERE username = '{user}';".format(user=username))
-            if int(x) > 0:
-                flash("That username is already taken, please choose another")
-                return render_template('register.html', form=form, db=db)
-            else:
-                curs.execute("INSERT INTO users (username, password, email) VALUES ('{user}', '{psw}', '{eml}')".
-                          format(user=username, psw=password, eml=email))
-                if email in ('had38@cam.ac.uk','sam68@cam.ac.uk','tylerp.linderoth@gmail.com','ib400@cam.ac.uk','bef22@hermes.cam.ac.uk','rd109@cam.ac.uk','gv268@cam.ac.uk', 'es754@cam.ac.uk') :
-                    curs.execute("commit")
-                    flash("Thanks for registering!")
-                    return redirect(url_for('login', db=db))
+            password=form.password.data
+            password2=form.password2.data
+            if db=='cichlid':
+                email_list=('had38@cam.ac.uk','sam68@cam.ac.uk','sm15@sanger.ac.uk', 'tylerp.linderoth@gmail.com','ib400@cam.ac.uk','bef22@hermes.cam.ac.uk','rd109@cam.ac.uk','rd@sanger.ac.uk', 'gv268@cam.ac.uk', 'es754@cam.ac.uk', 'hs10@sanger.ac.uk')
+            elif db=='darwin':
+                email_list=('had38@cam.ac.uk','sam68@cam.ac.uk','sm15@sanger.ac.uk','hd2@sanger.ac.uk', 'mara@sanger.ac.uk', 'kj2@sanger.ac.uk', 'rd@sanger.ac.uk', 'rd109@cam.ac.uk')
+            if password ==  password2:
+                password = hash_password(form.password.data)
+                curs = mysql.connection.cursor()
+                x = curs.execute("SELECT * FROM users WHERE username = '{user}';".format(user=username))
+                if int(x) > 0:
+                    flash("That username is already taken, please choose another")
+                    return render_template('register.html', form=form, db=db)
                 else:
-                    msg = Message(body='username: '+username+'\nemail: '+email+'\npassword: '+password, subject = 'New registration', sender ='had38@cam.ac.uk', recipients = ['had38@cam.ac.uk'])
-                    mail.send(msg)
-                    return redirect(url_for('db_index', db=db))
-                    flash("Thanks for registering: your registration is now pending approval")
-                curs.close()
+                    curs.execute("INSERT INTO users (username, password, email) VALUES ('{user}', '{psw}', '{eml}')".
+                              format(user=username, psw=password, eml=email))
+                    if email in email_list :
+                        curs.execute("commit")
+                        flash("Thanks for registering!")
+                        return redirect(url_for('login', db=db))
+                    else:
+                        msg = Message(body='username: '+username+'\nemail: '+email+'\npassword: '+password, subject = 'New registration', sender ='had38@cam.ac.uk', recipients = ['had38@cam.ac.uk'])
+                        mail.send(msg)
+                        return redirect(url_for('db_index', db=db))
+                        flash("Thanks for registering: your registration is now pending approval")
+                    curs.close()
+            else:
+                flash("The passwords did not match, please try again")
+                return render_template('register.html', form=form, db=db)
     except Exception as e:
         return("Issue: "+str(e))
     return render_template('register.html', title='Register', form=form, db=db)
@@ -605,8 +605,9 @@ def enter_data(db):
         elif 'Upload' in results:
             return redirect(url_for('upload', file = results['Upload'], db=db))
         else:
+            flash("your data have been submitted successfully")
             return redirect(url_for('enter_data', db=db))
-    return render_template('enter_data.html', title='Signed in as: '+usrname, form=form, prov_list=tuple(provider_list), db=db)
+    return render_template('enter_data.html', title='Signed in as: '+usrname, form=form, prov_list=tuple(provider_list), db=db, session=session)
 
 @app.route('/<db>/api/1.0/download/', methods=['GET', 'POST'])
 def download(db):
@@ -650,8 +651,9 @@ def get_files_per_lane_id(la_id, db):
     v_display_results, split_col=transpose_table(new_columns, display_results)
     crumbs=session.get('breadcrumbs', None)
     list_crumbs=[x[-1] for x in crumbs]
-    if 'lanes' not in list_crumbs:
+    if 'lane' not in list_crumbs:
         crumbs.append(session.get('query', None))
+    session['query']=[url_for('get_files_per_lane_id', la_id=la_id, db=db),'file']
     return render_template("mysqlV.html", title='Query was: file(s) where lane_accession = "' + str(l_accession)+'"', view_param=split_col, results=[v_display_results], db=db, crumbs=crumbs)
 
 @app.route('/<db>/api/1.0/images/', methods=['GET'])
@@ -672,10 +674,9 @@ def get_images(db):
         i_results=[row[0]]+[row[2]]+[row[1]]+list([row[3]+"/"+row[2]])+list(row[3:])
         results.append(i_results)
     new_column, display_results= change_for_display(columns, results)
+    session['query']=[url_for('get_images', db=db), 'image']
     crumbs=[[url_for('db_index', db=db), db]]
     session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_images', db=db), 'images']
-    session['html']='image'
     return render_template("image.html", title='Query was: all images', url_param=['individual', 2, '/'], results=[new_column,display_results], db=db, crumbs=crumbs)
 
 @app.route('/<db>/api/1.0/individual/', methods=['GET'])
@@ -719,24 +720,28 @@ def get_individual_per_individual_id(i_id, db):
     i_columns=get_columns_from_table('individual')
     id_columns=get_columns_from_table('individual_data')
     i_results=()
-    #all_results=[]
     new_columns=()
+    all_results=[]
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT i.*, id.*, p.name, p.alias, p.accession, p.ssid FROM individual i left join individual_data id on i.individual_id=id.individual_id left join allocation a \
-        on a.individual_id=i.individual_id left join project p on p.project_id=a.project_id where i.individual_id = '{identif}';". format(identif=i_id))
+        curs.execute("SELECT distinct i.*, p.name, p.alias, p.accession, p.ssid FROM individual i left join allocation a \
+        on a.individual_id=i.individual_id left join project p on p.project_id=a.project_id where i.individual_id = '{identif}' and i.latest=1;". format(identif=i_id))
         i_results=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
-    columns=i_columns[1:7]+tuple(["project_name","project_alias","project_accession","project_ssid"])
-    new_columns, all_results=add_sample_info(columns, i_results, curs)
-    complete_columns=new_columns+i_columns[7:]+id_columns[2:6]
-    new_column, display_results= change_for_display(complete_columns, all_results)
+    columns, results=add_project_info(i_columns[1:7], i_results)
+    new_columns, s_results=add_sample_info(columns, results, curs)
+    complete_columns=new_columns+i_columns[7:]#+id_columns[2:6]
+    all_results.append(list(s_results+i_results[0][7:16]))
+    new_column, display_results= change_for_display(complete_columns, tuple(all_results))
     v_display_results, split_col=transpose_table(list(new_column), display_results)
     crumbs=session.get('breadcrumbs', None)
     list_crumbs=[x[-1] for x in crumbs]
-    if 'individuals' not in list_crumbs and len(session.get('query', None)) > 0:
+    if 'individual' not in list_crumbs:
         crumbs.append(session.get('query', None))
+    else:
+        crumbs.pop()
+    session['query']=[url_for('get_individual_per_individual_id', i_id=i_id, db=db), 'individual']
     return render_template("mysqlV.html", title='Query was: individual = "' + str(all_results[0][1]) +'"', view_param=split_col, results=[v_display_results], db=db, crumbs=crumbs)
 
 @app.route('/<db>/api/1.0/individual/<ind_name>/', methods=['GET'])
@@ -753,20 +758,26 @@ def get_individual_per_individual_name(ind_name, db):
         i_results=curs.fetchall()
     except:
         flash ("Error: unable to fetch individuals")
-    if len(i_results) > 0:
-        columns=i_columns[1:7]+tuple(["project_name","project_alias","project_accession","project_ssid"])
-        new_columns, all_results=add_sample_info(columns, i_results, curs)
-        complete_columns=new_columns+i_columns[7:]+id_columns[2:6]
-        new_column, display_results= change_for_display(complete_columns, all_results)
-        v_display_results, split_col=transpose_table(list(new_column), display_results)
-    else:
-        flash("unable to fetch the individual(s)")
-        return redirect(url_for('db_index', db=db))
+    columns, results=add_project_info(i_columns[1:7], i_results)
+    new_columns, s_results=add_sample_info(columns, results, curs)
     curs.close()
+    complete_columns=new_columns+i_columns[7:]#+id_columns[2:6]
+    all_results.append(list(s_results+i_results[0][7:16]))
+    new_column, display_results= change_for_display(complete_columns, tuple(all_results))
+    v_display_results, split_col=transpose_table(list(new_column), display_results)
+    crumbs=session.get('breadcrumbs', None)
+    list_crumbs=[x[-1] for x in crumbs]
+    if 'individual' not in list_crumbs:
+        crumbs.append(session.get('query', None))
+    else:
+        crumbs.pop()
     crumbs=[[url_for('db_index', db=db), db]]
     list_crumbs=[x[-1] for x in crumbs]
-    if 'individual' not in list_crumbs and len(session.get('query', None)) > 0:
+    if 'individual' not in list_crumbs :
         crumbs.append(session.get('query', None))
+    else:
+        crumbs.pop()
+    session['query']=[url_for('get_individual_per_individual_name', ind_name=ind_name, db=db), 'individual']
     return render_template("mysqlV.html", title='Query was: individual = "' + str(ind_name) +'"', view_param=split_col, results=[v_display_results] , db=db, crumbs=crumbs)
 
 @app.route('/<db>/api/1.0/individual/<ind_name>/species/<sp_name>', methods=['GET'])
@@ -811,7 +822,7 @@ def get_lanes(db):
         id_results=list(row[:1])+[row[6]]+[row[5]]+list(row[1:5])+list(row[7:])
         results.append(id_results)
     new_column, display_results= change_for_display(columns[1:], results)
-    session['query']=[url_for('get_lanes', db=db), 'lanes']
+    session['query']=[url_for('get_lanes', db=db), 'lane']
     crumbs=[[url_for('db_index', db=db), db]]
     session['breadcrumbs'] = crumbs
     return render_template("mysql.html", title='Query was: all lanes', url_param=['file', 0,], results=[new_column, display_results], db=db, crumbs=crumbs)
@@ -837,8 +848,10 @@ def get_lanes_per_sample_id(spl_id, db):
     new_columns[5]='library_accession'
     crumbs=session.get('breadcrumbs', None)
     list_crumbs=[x[-1] for x in crumbs]
-    if 'sample' not in list_crumbs and 'lanes' not in list_crumbs:
+    if 'sample' not in list_crumbs:
         crumbs.append(session.get('query', None))
+    else:
+        crumbs.pop()
     session['breadcrumbs']=crumbs
     session['spl_id']=spl_id
     session['query']=[url_for('get_lanes_per_sample_id', spl_id=spl_id, db=db), 'lane']
@@ -859,9 +872,9 @@ def get_location(db):
         row=['' if x is None else x for x in row]
         results.append(row)
     curs.close()
-    session['query']=[]
     crumbs=[[url_for('db_index', db=db), db]]
     session['breadcrumbs'] = crumbs
+    session['query']=[url_for('get_location', db=db), 'location']
     return render_template("mysql.html", title='Query was: all locations', url_param=['location',0,'/individual'], results=[columns,results], db=db, crumbs=crumbs)
 
 @app.route('/<db>/api/1.0/location/<loc_id>/individual/', methods=['GET'])
@@ -885,7 +898,9 @@ def get_individual_per_location_id(loc_id, db):
     crumbs=session.get('breadcrumbs', None)
     list_crumbs=[x[-1] for x in crumbs]
     if 'location' not in list_crumbs:
-        crumbs.append([url_for('get_location', db=db), 'location'])
+        crumbs.append(session.get('query', None))
+    else:
+        crumbs.pop()
     session['locid']=loc_id
     session['breadcrumbs']=crumbs
     session['query']=[url_for('get_individual_per_location_id', loc_id=loc_id, db=db), 'individual']
@@ -930,7 +945,6 @@ def get_individual_per_name_and_per_location(location, ind_name, db):
     new_columns, display_results= change_for_display(columns, results)
     crumbs=[[url_for('db_index', db=db), db]]
     session['breadcrumbs'] = crumbs
-    session['query']=[]
     session['query']=[url_for('get_individual_per_name_and_per_location', location=location, ind_name=ind_name, db=db), 'individual']
     return render_template("mysql.html", title='Query was: individual(s) where location = "'+ location +'" and individual name = "'+ind_name+'"', url_param=['individual', 0, ''], results=[new_columns[:-1], remove_column(display_results, 'L')], db=db, crumbs=crumbs)
 
@@ -983,7 +997,7 @@ def get_projects(db):
     curs.close()
     crumbs=[[url_for('db_index', db=db), db]]
     session['breadcrumbs'] = crumbs
-    session['query']=[]
+    session['query']=[url_for('get_projects', db=db), 'projects']
     return render_template("mysql.html", title='Query was: all projects', url_param=['project', 3, ], results=[columns,results], db=db, crumbs=crumbs)
 
 @app.route('/<db>/api/1.0/project/<accession>', methods=['GET'])
@@ -1005,7 +1019,7 @@ def get_project_per_accession(accession, db):
         flash('Unknown project accession')
         return redirect(url_for('db_index', db=db))
     new_columns, display_results= change_for_display(columns, results)
-    crumbs=session.get('breadcrumbs', None)
+    crumbs=[[url_for('db_index', db=db), db]]
     list_crumbs=[x[-1] for x in crumbs]
     if 'project' not in list_crumbs:
         crumbs.append([url_for('get_projects', db=db), 'project'])
@@ -1035,7 +1049,6 @@ def get_individual_per_project_accession_and_name(accession, ind_name, db):
     new_columns, display_results= change_for_display(columns[1:7], results)
     crumbs=[[url_for('db_index', db=db), db]]
     session['breadcrumbs'] = crumbs
-    session['query']=[]
     session['query']=[url_for('get_individual_per_project_accession_and_name', accession=accession, ind_name=ind_name, db=db), 'individual']
     return render_template("mysql.html", title='Query was: individual(s) where project_accession = "'+accession+'" & individual_name = "'+ind_name +'"', url_param=['individual', 0,], results=[new_columns[:-1], remove_column(display_results, 'L')], db=db, crumbs=crumbs)
 
@@ -1097,7 +1110,7 @@ def get_provider(db):
     curs.close()
     crumbs=[[url_for('db_index', db=db), db]]
     session['breadcrumbs'] = crumbs
-    session['query']=[]
+    session['query']=[url_for('get_provider', db=db), 'provider']
     return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0, '/individual' ], results=[columns,results], db=db, crumbs=crumbs)
 
 @app.route('/<db>/api/1.0/provider/<p_id>/individual', methods=['GET'])
@@ -1115,7 +1128,9 @@ def get_individual_by_provider(p_id, db):
     crumbs=session.get('breadcrumbs', None)
     list_crumbs=[x[-1] for x in crumbs]
     if 'provider' not in list_crumbs:
-        crumbs.append([url_for('get_provider', db=db), 'provider'])
+        crumbs.append(session.get('query', None))
+    else:
+        crumbs.pop()
     session['pid']=p_id
     session['breadcrumbs']=crumbs
     session['query']=[url_for('get_individual_by_provider', p_id=p_id, db=db), 'individual']
@@ -1145,7 +1160,7 @@ def get_samples(db):
         results.append(tuple(id_results))
     curs.close()
     new_columns, display_results= change_for_display(columns, results)
-    session['query']=[]
+    session['query']=[url_for('get_samples', db=db), 'sample']
     crumbs=[[url_for('db_index', db=db), db]]
     session['breadcrumbs'] = crumbs
     return render_template("mysql.html", title='Query was: all samples', url_param=['lane', 0, ''], results=[new_columns,display_results], db=db, crumbs=crumbs)
@@ -1181,7 +1196,9 @@ def get_samples_per_material_name(m_id, db):
     crumbs=session.get('breadcrumbs', None)
     list_crumbs=[x[-1] for x in crumbs]
     if 'sample' not in list_crumbs:
-        crumbs.append([url_for('get_material', db=db), 'material'])
+        crumbs.append(session.get('query', None))
+    else:
+        crumbs.pop()
     session['mid']=m_id
     session['breadcrumbs']=crumbs
     session['query']=[url_for('get_samples_per_material_name', m_id=m_id, db=db), 'sample']
@@ -1217,9 +1234,9 @@ def get_samples_by_name(sname, db):
         flash("no sample associated with this/these sample name(s)")
         return redirect(url_for('db_index', db=db))
     crumbs=[[url_for('db_index', db=db), db]]
-    session['query']=[]
     session['mid']=sresults[0][2]
     session['breadcrumbs']=crumbs
+    session['query']=[url_for('get_samples_by_name', sname=sname, db=db), 'sample']
     return render_template("mysql.html", title='Query was: sample(s) where sample_name  = "' +sname+'"', url_param=['lane', 0,], results=[columns,results], db=db, crumbs=crumbs)
 
 @app.route('/<db>/api/1.0/sample/<sname>/individual/<ind_name>', methods=['GET'])
@@ -1381,9 +1398,9 @@ def get_species(db):
     curs.close()
     results=remove_column(results, 1)
     new_columns, display_results= change_for_display(columns, results)
-    session['query']=[]
     crumbs=[[url_for('db_index', db=db), db]]
     session['breadcrumbs'] = crumbs
+    session['query']=[url_for('get_species', db=db), 'species']
     return render_template("mysql.html", title='Query was: all species', url_param=['species/tax_id',3, ], results=[new_columns, display_results], db=db, crumbs=crumbs)
 
 @app.route('/<db>/api/1.0/species/<sp_id>/individual/', methods=['GET'])
@@ -1406,7 +1423,9 @@ def get_individual_per_species_id(sp_id, db):
     sp_name=session.get('spname', None)
     list_crumbs=[x[-1] for x in crumbs]
     if 'species' not in list_crumbs:
-        crumbs.append([url_for('get_species_per_name', sp_name=sp_name, db=db), 'species'])
+        crumbs.append(session.get('query', None))
+    else:
+        crumbs.pop()
     session['spid']=sp_id
     session['breadcrumbs']=crumbs
     session['query']=[url_for('get_individual_per_species_id', sp_id=sp_id, db=db), 'individual']
@@ -1426,10 +1445,10 @@ def get_species_per_name(sp_name, db):
     curs.close()
     results=remove_column(results, 1)
     new_columns, display_results= change_for_display(columns, results)
-    session['query']=[]
     session['spname']=sp_name
     crumbs=[[url_for('db_index', db=db), db]]
     session['breadcrumbs']=crumbs
+    session['query']=[url_for('get_species_per_name', sp_name=sp_name, db=db), 'species']
     return render_template("mysql.html", title='Query was: all species where name or common_name contains "' + sp_name +'"', url_param=['species', 0, '/individual'],results=[new_columns,display_results], db=db, crumbs=crumbs)
 
 @app.route('/<db>/api/1.0/species/tax_id/<tax_id>', methods=['GET'])
@@ -1450,6 +1469,8 @@ def get_individual_per_tax_id(tax_id, db):
     list_crumbs=[x[-1] for x in crumbs]
     if 'species' not in list_crumbs:
         crumbs.append([url_for('get_species', db=db), 'species'])
+    else:
+        crumbs.pop()
     session['breadcrumbs']=crumbs
     session['taxid']=tax_id
     session['query']=[url_for('get_individual_per_tax_id', tax_id=tax_id, db=db), 'individual']
