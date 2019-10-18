@@ -1,6 +1,6 @@
 #!/Library/Frameworks/Python.framework/Versions/3.7/bin/python3
  #/usr/bin/python3 for web version
-from flask import Flask, render_template, request,  flash, redirect, url_for, session, send_file
+from flask import Flask, render_template, request,  flash, redirect, url_for, session, send_file, jsonify
 from flask_mysqldb import MySQL
 from flask_migrate import Migrate
 from flask_login import UserMixin, login_user, logout_user, current_user, login_required, LoginManager
@@ -609,7 +609,6 @@ def index():
             "MAIL_USERNAME": configSettings["Mail_usrn"],
             "MAIL_PASSWORD": configSettings["Mail_pswd"]
         }
-        curs = mysql.connection.cursor()
         app.config.update()
         session['query']=[]
         return redirect(url_for('db_index', db=db))

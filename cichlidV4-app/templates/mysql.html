@@ -106,14 +106,7 @@
               page: 'current'}}},
           {extend: 'pdf', text: 'Save current page (pdf)',
               exportOptions: { modifier: {
-              page: 'current'}}},
-          {text: 'Export as jSON',
-              action: function ( e, dt, button, config ) {
-                 var data = dt.buttons.exportData();
-                 $.fn.dataTable.fileSave(
-                     new Blob( [ JSON.stringify( data ) ] ),
-                         'Export.json');
-                   }}
+              page: 'current'}}}
         ],
         "columnDefs": [ {
           "targets": 0,
