@@ -64,15 +64,15 @@ div.a {
 <div class="dropdown" name='dropdown'>
   <button onclick="myFunction()" class="dropbtn">Select a table</button>
   <div id="myDropdown" class="dropdown-content">
-    <a href="{{ url_for('get_images', db=db) }}">Images</a>
-    <a href="{{ url_for('get_individuals', db=db) }}">Individual</a>
-    <a href="{{ url_for('get_lanes', db=db) }}">Lane</a>
-    <a href="{{ url_for('get_location', db=db) }}">Location</a>
-    <a href="{{ url_for('get_material', db=db) }}">Material</a>
-    <a href="{{ url_for('get_projects', db=db ) }}">Project</a>
-    <a href="{{ url_for('get_provider', db=db) }}">Provider</a>
-    <a href="{{ url_for('get_samples', db=db) }}">Sample</a>
-    <a href="{{ url_for('get_species', db=db) }}">Species</a>
+    <a href="{{ url_for('get_images', db=db, json=json) }}">Images</a>
+    <a href="{{ url_for('get_individuals', db=db, json=json) }}">Individual</a>
+    <a href="{{ url_for('get_lanes', db=db, json=json) }}">Lane</a>
+    <a href="{{ url_for('get_location', db=db, json=json) }}">Location</a>
+    <a href="{{ url_for('get_material', db=db, json=json) }}">Material</a>
+    <a href="{{ url_for('get_projects', db=db, json=json) }}">Project</a>
+    <a href="{{ url_for('get_provider', db=db, json=json) }}">Provider</a>
+    <a href="{{ url_for('get_samples', db=db, json=json) }}">Sample</a>
+    <a href="{{ url_for('get_species', db=db, json=json) }}">Species</a>
   </div>
 </div>
 

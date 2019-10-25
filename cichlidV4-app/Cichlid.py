@@ -59,7 +59,10 @@ def add_individual_data_info(col, data):
             curs.execute("SELECT distinct * from individual_data where latest=1 and individual_id = '{indi}';". format(indi=data[0]))
             id_results=curs.fetchall()
         except:
-            flash ("Error: unable to fetch individual_data information")
+            if json=='json':
+                return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+            else:
+                flash ("Error: unable to fetch individual_data information")
         if len(id_results) > 0:
             #to cope with case when there is more than one individual_data associated with the individual
             for id_result in id_results:
@@ -110,7 +113,10 @@ def add_sample_info(col, data):
             curs.execute("SELECT distinct s.* from sample s left join material m on m.material_id=s.material_id where s.latest=1 and m.individual_id = '{indi}';". format(indi=data[0]))
             s_results=curs.fetchall()
         except:
-            flash ("Error: unable to fetch sample information")
+            if json=='json':
+                return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+            else:
+                flash ("Error: unable to fetch sample information")
         if len(s_results) > 0:
             #to cope with case when there is more than one sample associated with the individual
             for s_result in s_results:
@@ -202,7 +208,10 @@ def change_for_display(col, data):
                     else:
                         row[dic_index]=results[0][0]
                 except:
-                    flash ("Error: unable to fetch items: "+"SELECT "+table_dic[table_name_dic[dic_index]]+ " FROM "+table_name_dic[dic_index]+" WHERE "+table_name_dic[dic_index]+"_id = '{id}';". format(id=row[dic_index]))
+                    if json=='json':
+                        return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+                    else:
+                        flash ("Error: unable to fetch items: "+"SELECT "+table_dic[table_name_dic[dic_index]]+ " FROM "+table_name_dic[dic_index]+" WHERE "+table_name_dic[dic_index]+"_id = '{id}';". format(id=row[dic_index]))
                 curs.close()
         #section to add data in correct field when several fields are returned
         #if 'cv_attribute' field in column (can have multiple entries):
@@ -220,7 +229,7 @@ def change_for_display(col, data):
                     row.insert(column.index('country_of_origin')+idx, '')
             else:
                 for idx in range(1,5):
-                    row.insert(column.index('country_of_origin')+idx, row[column.index('country_of_origin')][idx])
+                    row.insert(column.index('country_of_origin')+idx, str(row[column.index('country_of_origin')][idx]))
                 row[column.index('country_of_origin')]= str(row[column.index('country_of_origin')][0])
         #reformat number of reads and length data
         if 'nber_reads' in column and row[column.index('nber_reads')] is not None:
@@ -263,7 +272,10 @@ def get_columns_from_table(table_name):
         curs.execute("SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS where table_schema=  '"+configSettings['MySQL_db'] +"' and table_name='%s' ORDER BY ORDINAL_POSITION;" %table_name)
         columns=curs.fetchall()
     except:
-        flash ("Error: unable to fetch column names")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch column names")
     curs.close()
     #transforming the returned tuples [(('location_id',), ('country_of_origin',),...)] into a list that can be then changed into one tuple
     for col_name in columns:
@@ -405,6 +417,14 @@ def transpose_table(col, data):
     blank_position_list=[new_columns[x] for x in index_blank_column]
     return vertical_data, blank_position_list
 
+def tuple_to_dic(col, data):
+    new_list=[]
+    for index in range(0, len(data)):
+        new_dic={}
+        for column_index in range(0, len(col)):
+            new_dic[col[column_index]]=data[index][column_index]
+        new_list.append(new_dic)
+    return new_list
 ################### PASSWORD FUNCTIONS #########################################
 def hash_password(password):
     """Hash a password for storing."""
@@ -435,6 +455,7 @@ def db_index(db):
     individual_name=""
     list_proj=[]
     list_loc =[]
+    json="web"
     if 'usrname' not in session:
         session['usrname']=""
     session['name']=""
@@ -443,12 +464,18 @@ def db_index(db):
         curs.execute("SELECT accession, name FROM project")
         prows=curs.fetchall()
     except:
-        flash ("Error: unable to fetch projects")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch projects")
     try:
         curs.execute("SELECT distinct location FROM location where location is not NULL")
         lrows=curs.fetchall()
     except:
-        flash ("Error: unable to fetch location information")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch location information")
     curs.close()
     #define menus to display to users
     for proj in prows:
@@ -464,7 +491,7 @@ def db_index(db):
         individual_name=""
         species_name = ""
         flag=""
-        loc_r=""
+        loc_region=""
         accession=""
         sample_name=""
         sample_accession=""
@@ -481,7 +508,7 @@ def db_index(db):
             sample_name=details['sname']
             flag+="X"
         if not details['loc_choice'].startswith("  and / or"):
-            loc_r=details['loc_choice']
+            loc_region=details['loc_choice']
             flag+='L'
         if len(flag)==0:
             flash('Please enter your selection')
@@ -500,48 +527,48 @@ def db_index(db):
          'IX' : 'get_samples_by_sample_name_and_individual_name', 'XL': 'get_samples_by_sample_name_and_location'}
         arg_dic={'A':project_acc.split(" - ")[0], 'I': individual_name, 'S': species_name,
         'AI': [project_acc.split(" - ")[0], individual_name], 'AS': [project_acc.split(" - ")[0], species_name]
-        ,'L': loc_r, 'AL': [project_acc.split(" - ")[0], loc_r], 'IL' : [individual_name, loc_r],
-        'SL': [species_name,loc_r], 'IS':[individual_name, species_name], 'X': sample_name,
+        ,'L': loc_region, 'AL': [project_acc.split(" - ")[0], loc_region], 'IL' : [individual_name, loc_region],
+        'SL': [species_name,loc_region], 'IS':[individual_name, species_name], 'X': sample_name,
         'SX':[sample_name, species_name], 'AX':[sample_name, project_acc.split(" - ")[0]],
-        'IX' : [sample_name, individual_name], 'XL' : [sample_name, loc_r]}
+        'IX' : [sample_name, individual_name], 'XL' : [sample_name, loc_region]}
         if flag == 'A':
-            return redirect(url_for(url_dic[flag], accession=arg_dic[flag], db=db))
+            return redirect(url_for(url_dic[flag], accession=arg_dic[flag], db=db, json=json))
         elif flag == 'AI':
-            return redirect(url_for(url_dic[flag], accession=arg_dic[flag][0], ind_name=arg_dic[flag][1], db=db))
+            return redirect(url_for(url_dic[flag], accession=arg_dic[flag][0], ind_name=arg_dic[flag][1], db=db, json=json))
         elif flag == 'AS':
-                return redirect(url_for(url_dic[flag], accession=arg_dic[flag][0], sp_name=arg_dic[flag][1], db=db))
+                return redirect(url_for(url_dic[flag], accession=arg_dic[flag][0], sp_name=arg_dic[flag][1], db=db, json=json))
         elif flag=='I':
             session['breadcrumbs']=[[url_for('db_index', db=db), db]]
-            session['query']=[url_for('get_individual_per_individual_name', ind_name=individual_name, db=db), 'individual']
-            return redirect(url_for(url_dic[flag], ind_name= individual_name, db=db))
+            session['query']=[url_for('get_individual_per_individual_name', ind_name=individual_name, db=db, json=json), 'individual']
+            return redirect(url_for(url_dic[flag], ind_name= individual_name, db=db, json=json))
         elif flag=='IS':
-            return redirect(url_for(url_dic[flag], ind_name= individual_name, sp_name=arg_dic[flag][1], db=db))
+            return redirect(url_for(url_dic[flag], ind_name= individual_name, sp_name=arg_dic[flag][1], db=db, json=json))
         elif flag=='S':
-            return redirect(url_for(url_dic[flag], sp_name=species_name, db=db))
+            return redirect(url_for(url_dic[flag], sp_name=species_name, db=db, json=json))
         elif flag =='L':
-            return redirect(url_for(url_dic[flag], location=loc_r, db=db))
+            return redirect(url_for(url_dic[flag], location=loc_region, db=db, json=json))
         elif flag =='SL':
-            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], sp_name=arg_dic[flag][0], db=db))
+            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], sp_name=arg_dic[flag][0], db=db, json=json))
         elif flag =='IL':
             session['breadcrumbs']=[[url_for('db_index', db=db), db]]
-            session['query']=[url_for('get_individual_per_location', location=loc_r, db=db), 'individual']
-            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], ind_name=arg_dic[flag][0], db=db))
+            session['query']=[url_for('get_individual_per_location', location=loc_region, db=db, json=json), 'individual']
+            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], ind_name=arg_dic[flag][0], db=db, json=json))
         elif flag =='AL':
-            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], accession=arg_dic[flag][0], db=db))
+            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], accession=arg_dic[flag][0], db=db, json=json))
         elif flag =='X':
-            return redirect(url_for(url_dic[flag], sname=sample_name, db=db))
+            return redirect(url_for(url_dic[flag], sname=sample_name, db=db, json=json))
         elif flag =='XL':
-            return redirect(url_for(url_dic[flag], sname=sample_name, location=loc_r, db=db))
+            return redirect(url_for(url_dic[flag], sname=sample_name, location=loc_region, db=db, json=json))
         elif flag =='IX':
-            return redirect(url_for(url_dic[flag], sname=sample_name, ind_name=individual_name, db=db))
+            return redirect(url_for(url_dic[flag], sname=sample_name, ind_name=individual_name, db=db, json=json))
         elif flag =='SX':
-            return redirect(url_for(url_dic[flag], sname=sample_name, sp_name=species_name, db=db))
+            return redirect(url_for(url_dic[flag], sname=sample_name, sp_name=species_name, db=db, json=json))
         elif flag =='AX':
-            return redirect(url_for(url_dic[flag], sname=sample_name, accession=arg_dic[flag][-1], db=db))
+            return redirect(url_for(url_dic[flag], sname=sample_name, accession=arg_dic[flag][-1], db=db, json=json))
         else:
             return redirect(url_for('db_index', db=db))
             flash("Please enter valid criteria")
-    return render_template("entry.html", title='Query was: returnall', form=form, project_list=tuple(list_proj), loc_list=tuple(list_loc), db=db)
+    return render_template("entry.html", title='Query was: returnall', form=form, project_list=tuple(list_proj), loc_list=tuple(list_loc), db=db, json=json)
 
 @app.route('/<db>/api/1.1/entry', methods=['GET', 'POST'])
 def enter_data(db):
@@ -554,7 +581,10 @@ def enter_data(db):
         curs.execute("SELECT distinct provider_name FROM provider")
         provider_res=curs.fetchall()
     except:
-        flash ("Error: unable to fetch provider names")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch provider names")
     curs.close()
     for prov in provider_res:
         provider_list.append(prov[0])
@@ -628,7 +658,10 @@ def login(db):
             curs.execute("SELECT * FROM users where username ='%s';" % details['username'])
             rows=curs.fetchall()
         except:
-            flash ("Error: unable to fetch items")
+            if json=='json':
+                return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+            else:
+                flash ("Error: unable to fetch items")
         curs.close()
         if len(rows) == 0:#if user is None or not user.check_password(form.password.data):
             flash('Invalid username or password')
@@ -712,8 +745,8 @@ def upload(file, db):
     return redirect(url_for('db_index', db=db))
 
 ################### API RELATED FUNCTIONS ######################################
-@app.route('/<db>/api/1.1/file/<la_id>', methods=['GET'])
-def get_files_per_lane_id(la_id, db):
+@app.route('/<db>/api/1.1/file/<la_id>/<json>', methods=['GET'])
+def get_files_per_lane_id(la_id, db, json):
     results=[]
     file_columns=get_columns_from_table('file')
     columns=tuple([file_columns[1]]+[file_columns[3]]+[file_columns[2]]+list(file_columns[4:]))
@@ -722,32 +755,41 @@ def get_files_per_lane_id(la_id, db):
         curs.execute("SELECT distinct f.*, l.accession FROM file f join lane l on f.lane_id=l.lane_id where f.latest=1 and f.lane_id = '%s';" % la_id)
         fresults=curs.fetchall()
     except:
-        flash ("Error: unable to fetch files")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch files")
+    curs.close()
     if len(fresults) == 0:
-        flash ("Error: no file available")
-        return redirect(session['query'][0])
+        if json == 'json':
+            return jsonify({"Data error":"no file associated with criteria provided"})
+        else:
+            flash ("Error: no file associated with criteria provided")
+            return redirect(session['query'][0])
     else:
         for row in fresults:
             f_results=[row[1]]+[row[3]]+[row[2]]+list(row[4:])
             lane_accession=row[-1]
             results.append(f_results)
-        curs.close()
         new_column, display_results= change_for_display([columns], results)
         new_columns= list(new_column)
         new_columns[0][5]='file_type'
         v_display_results, split_col=transpose_table(new_columns, display_results)
-        #to display navigation history
-        crumbs=session.get('breadcrumbs', None)
-        session['breadcrumbs'].append(session.get('query', None))
-        list_crumbs=[x[-1] for x in crumbs]
-        session['breadcrumbs'] = crumbs
-        if 'file' in list_crumbs:
-            session['query']=[]
-        #for vertical display: view_param (field before which blank line will be inserted), results (data to display with field, data_file1, data_file2...), crumbs (to display navigation history))
-        return render_template("mysqlV.html", title='Query was: file(s) where lane_accession = "' + str(lane_accession)+'"', view_param=split_col, results=[v_display_results], db=db, crumbs=crumbs)
+        if json =='json':
+            return jsonify(tuple_to_dic(new_columns[0], display_results))
+        else:
+            #to display navigation history
+            crumbs=session.get('breadcrumbs', None)
+            session['breadcrumbs'].append(session.get('query', None))
+            list_crumbs=[x[-1] for x in crumbs]
+            session['breadcrumbs'] = crumbs
+            if 'file' in list_crumbs:
+                session['query']=[]
+            #for vertical display: view_param (field before which blank line will be inserted), results (data to display with field, data_file1, data_file2...), crumbs (to display navigation history))
+            return render_template("mysqlV.html", title='Query was: file(s) where lane_accession = "' + str(lane_accession)+'"', view_param=split_col, results=[v_display_results], db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/image/<im_id>', methods=['GET'])
-def get_image_per_image_id(im_id, db):
+@app.route('/<db>/api/1.1/image/<im_id>/<json>', methods=['GET'])
+def get_image_per_image_id(im_id, db, json):
     results=[]
     columns=get_columns_from_table('image')
     col=[columns[0]]+[columns[2]]+[columns[1]]+['thumbnail']+list(columns[3:])
@@ -757,24 +799,36 @@ def get_image_per_image_id(im_id, db):
         curs.execute("SELECT * FROM image where latest=1 and image_id = '%s';" % im_id)
         img_results=curs.fetchall()
     except:
-        flash ("Error: unable to fetch images")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch images")
     curs.close()
-    for row in img_results:
-        i_results=[row[0]]+[row[2]]+[row[1]]+list([row[3]+"/"+row[2]])+list(row[3:])
-        results.append(i_results)
-    new_column, display_results= change_for_display([columns], results)
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if 'individual' not in list_crumbs:
-        session['breadcrumbs'].append(session.get('query', None))
+    if len(img_results) ==0:
+        if json == 'json':
+            return jsonify({"Data error":"no image associated with criteria provided"})
+        else:
+            flash ("Error: no image associated with criteria provided")
     else:
-        crumbs.pop()
-    session['query']=[url_for('get_image_per_image_id', im_id=im_id, db=db), 'individual']
-    #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] indicate no display), crumbs (to display navigation history))
-    return render_template("image.html", title="Query was: file name (image_id) = '"+img_results[0][2] +"' ("+str(im_id) +")" , url_param=['individual/name', 2], results=[new_column[0],display_results], plus=['', ''], db=db, crumbs=crumbs)
+        for row in img_results:
+            i_results=[row[0]]+[row[2]]+[row[1]]+list([row[3]+"/"+row[2]])+list(row[3:])
+            results.append(i_results)
+        new_column, display_results= change_for_display([columns], results)
+        if json =='json':
+            return jsonify(tuple_to_dic(new_column[0],display_results))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if 'individual' not in list_crumbs:
+                session['breadcrumbs'].append(session.get('query', None))
+            else:
+                crumbs.pop()
+            session['query']=[url_for('get_image_per_image_id', im_id=im_id, db=db, json=json), 'individual']
+            #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] indicate no display), crumbs (to display navigation history))
+            return render_template("image.html", title="Query was: file name (image_id) = '"+img_results[0][2] +"' ("+str(im_id) +")" , url_param=['individual/name', 2, '/web'], results=[new_column[0],display_results], plus=['', ''], db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/images/', methods=['GET'])
-def get_images(db):
+@app.route('/<db>/api/1.1/image/<json>', methods=['GET'])
+def get_images(db, json):
     results=[]
     columns=get_columns_from_table('image')
     col=[columns[0]]+[columns[2]]+[columns[1]]+['thumbnail']+[columns[4]]
@@ -784,23 +838,32 @@ def get_images(db):
         curs.execute("SELECT * FROM image where latest=1")
         img_results=curs.fetchall()
     except:
-        flash ("Error: unable to fetch images")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch images")
     curs.close()
     if len(img_results) ==0:
-        flash ("Error: no image data available")
-        return redirect(url_for('db_index', db=db))
+        if json == 'json':
+            return jsonify({"Data error":"no image data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no image data available in the database '"+db+"'")
+            return redirect(url_for('db_index', db=db))
     for row in img_results:
         i_results=[row[0]]+[row[2]]+[row[1]]+list([row[3]+"/"+row[2]])+[row[4]]
         results.append(tuple(i_results))
     new_column, display_results= change_for_display([columns], results)
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_images', db=db), 'image']
-    #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed)crumbs (to display navigation history))
-    return render_template("image.html", title='Query was: all images', url_param=['image', 0], results=[new_column[0],display_results], plus=['all', 'yes'], db=db, crumbs=crumbs)
+    if json =='json':
+        return get_images_all(db=db, json=json)
+    else:
+        crumbs=[[url_for('db_index', db=db), db]]
+        session['breadcrumbs'] = crumbs
+        session['query']=[url_for('get_images', db=db, json=json), 'image']
+        #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed)crumbs (to display navigation history))
+        return render_template("image.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['all/web', 'yes'], db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/images/all', methods=['GET'])
-def get_images_all(db):
+@app.route('/<db>/api/1.1/image/all/<json>', methods=['GET'])
+def get_images_all(db, json):
     results=[]
     columns=get_columns_from_table('image')
     col=[columns[0]]+[columns[2]]+[columns[1]]+['thumbnail']+list(columns[3:])
@@ -810,20 +873,33 @@ def get_images_all(db):
         curs.execute("SELECT * FROM image")
         img_results=curs.fetchall()
     except:
-        flash ("Error: unable to fetch images")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch images")
     curs.close()
-    for row in img_results:
-        i_results=[row[0]]+[row[2]]+[row[1]]+list([row[3]+"/"+row[2]])+list(row[3:])
-        results.append(tuple(i_results))
-    new_column, display_results= change_for_display([columns], results)
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_images', db=db), 'image']
-    #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
-    return render_template("image.html", title='Query was: all images', url_param=['image', 0], results=[new_column[0],display_results], plus=['.', 'no'], db=db, crumbs=crumbs)
+    if len(img_results)==0:
+        if json == 'json':
+            return jsonify({"Data error":"no image data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no image data available in the database '"+db+"'")
+            return redirect(url_for('db_index', db=db))
+    else:
+        for row in img_results:
+            i_results=[row[0]]+[row[2]]+[row[1]]+list([row[3]+"/"+row[2]])+list(row[3:])
+            results.append(tuple(i_results))
+        new_column, display_results= change_for_display([columns], results)
+        if json =='json':
+            return jsonify(tuple_to_dic(new_column[0],display_results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_images', db=db, json=json), 'image']
+            #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
+            return render_template("image.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['/'+db+'/api/1.1/image/web', 'no'], db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/individual/<i_id>', methods=['GET'])
-def get_individual_per_individual_id(i_id, db):
+@app.route('/<db>/api/1.1/individual/<i_id>/<json>', methods=['GET'])
+def get_individual_per_individual_id(i_id, db, json):
     i_columns=get_columns_from_table('individual')
     id_columns=get_columns_from_table('individual_data')
     ind_name_dic={}
@@ -837,37 +913,50 @@ def get_individual_per_individual_id(i_id, db):
         on a.individual_id=i.individual_id left join project p on p.project_id=a.project_id where i.individual_id in {identif} and i.latest=1;". format(identif=ind_id))
         i_results=curs.fetchall()
     except:
-        flash ("Error: unable to fetch individuals")
-    curs.close()
-    for index in range(0, len(i_results)):
-        ind_name_dic[i_results[index][2]]=i_results[index][1]
-        if i_results[index][0] in res_dic:
-            res_dic[i_results[index][0]].append(i_results[index])
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
-            res_dic[i_results[index][0]]=[i_results[index]]
-    for entry in res_dic:
-        columns, p_results=add_project_info(i_columns[1:7], res_dic[entry])
-        new_column, sp_results=add_sample_info(columns, p_results)
-        updated_columns, updated_results=add_individual_data_info(new_column, sp_results)
-        all_columns.append(updated_columns+i_columns[7:])
-        all_results.append(updated_results+res_dic[entry][0][7:16])
-    display_columns, display_results = change_for_display(all_columns, list(all_results))
-    v_display_results, split_col=transpose_table(display_columns, display_results)
-    crumbs=session.get('breadcrumbs', None)
-    if len(crumbs) >1:
-        list_crumbs=[x[-1] for x in crumbs]
-        if 'individual' in list_crumbs:
-            if 'location' in list_crumbs or 'project' in list_crumbs or 'species' in list_crumbs:#session['breadcrumbs'].append(session.get('query', None))
-                crumbs.pop()
-                session['breadcrumbs'].append(session.get('query', None))
+            flash ("Error: unable to fetch individuals")
+    curs.close()
+    if len(i_results)==0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(session['query'][0])
     else:
-        session['breadcrumbs'].append(session.get('query', None))
-    for_display=str(ind_name_dic)[1:-1].replace(",", "),").replace(": ", " (")+")"
-    #for vertical display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), crumbs (to display navigation history))
-    return render_template("mysqlV.html", title='Query was: supplier_name (individual_id) = ' + for_display, view_param=split_col, results=[v_display_results], db=db, crumbs=crumbs)
+        for index in range(0, len(i_results)):
+            ind_name_dic[i_results[index][2]]=i_results[index][1]
+            if i_results[index][0] in res_dic:
+                res_dic[i_results[index][0]].append(i_results[index])
+            else:
+                res_dic[i_results[index][0]]=[i_results[index]]
+        for entry in res_dic:
+            columns, p_results=add_project_info(i_columns[1:7], res_dic[entry])
+            new_column, sp_results=add_sample_info(columns, p_results)
+            updated_columns, updated_results=add_individual_data_info(new_column, sp_results)
+            all_columns.append(updated_columns+i_columns[7:])
+            all_results.append(updated_results+res_dic[entry][0][7:16])
+        display_columns, display_results = change_for_display(all_columns, list(all_results))
+        v_display_results, split_col=transpose_table(display_columns, display_results)
+        if json == "json":
+            return jsonify(tuple_to_dic(display_columns[0], display_results))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            if len(crumbs) >1:
+                list_crumbs=[x[-1] for x in crumbs]
+                if 'individual' in list_crumbs:
+                    if 'location' in list_crumbs or 'project' in list_crumbs or 'species' in list_crumbs:#session['breadcrumbs'].append(session.get('query', None))
+                        crumbs.pop()
+                        session['breadcrumbs'].append(session.get('query', None))
+            else:
+                session['breadcrumbs'].append(session.get('query', None))
+            for_display=str(ind_name_dic)[1:-1].replace(",", "),").replace(": ", " (")+")"
+            #for vertical display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), crumbs (to display navigation history))
+            return render_template("mysqlV.html", title='Query was: supplier_name (individual_id) = ' + for_display, view_param=split_col, results=[v_display_results], db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/individual/name/<ind_name>', methods=['GET'])
-def get_individual_per_individual_name(ind_name, db):
+@app.route('/<db>/api/1.1/individual/name/<ind_name>/<json>', methods=['GET'])
+def get_individual_per_individual_name(ind_name, db, json):
     ind_list=ind_name.replace(" ","").replace(",", "','")
     results=""
     curs = mysql.connection.cursor()
@@ -875,16 +964,29 @@ def get_individual_per_individual_name(ind_name, db):
         curs.execute("SELECT distinct i.individual_id, im.image_id FROM individual i left join image im on i.individual_id=im.individual_id where i.name in ('{identif}') or i.alias in ('{identif}') ". format(identif=ind_list))
         i_results=curs.fetchall()
     except:
-        flash ("Error: unable to fetch individuals")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch individuals")
     curs.close()
-    for row in i_results:
-        results+=","+str(row[0])
-    crumbs=session.get('breadcrumbs', None)
-    session['breadcrumbs'].append(session.get('query', None))
-    return(redirect(url_for('get_individual_per_individual_id', i_id=results[1:], db=db)))
+    if len(i_results)==0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(session['query'][0])
+    else:
+        for row in i_results:
+            results+=","+str(row[0])
+        if json == 'json':
+            return get_individual_per_individual_id(i_id=results[1:], db=db, json=json)
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            session['breadcrumbs'].append(session.get('query', None))
+            return(redirect(url_for('get_individual_per_individual_id', i_id=results[1:], db=db, json=json)))
 
-@app.route('/<db>/api/1.1/individuals/', methods=['GET'])
-def get_individuals(db):
+@app.route('/<db>/api/1.1/individual/<json>', methods=['GET'])
+def get_individuals(db, json):
     icolumns=get_columns_from_table('individual')
     columns=list(icolumns[1:8]+tuple(['samples']))
     curs = mysql.connection.cursor()
@@ -895,20 +997,35 @@ def get_individuals(db):
         i.alias, i.species_id, i.sex, i.accession, i.location_id")
         iresults=curs.fetchall()
     except:
-        flash ("Error: unable to fetch individuals")
-        curs.close()
-    new_columns, display_results= change_for_display(list([tuple(columns)]), list(iresults))
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_individuals', db=db), 'individual']
-    if session.get('html', None) =='image':
-        return redirect(url_for('get_images', db=db))
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch individuals")
+    curs.close()
+    if len(iresults)==0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no individual data available in the database '"+db+"'")
+            return redirect(session['query'][0])
     else:
-        #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
-        return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['all', 'yes'],db=db, crumbs=crumbs)
+        new_columns, results= change_for_display(list([tuple(columns)]), list(iresults))
+        if json == 'json':
+            return get_individuals_all(db=db, json=json)
+        else:
+            columns=new_columns[0][:-4]+new_columns[0][-2:-1]
+            display_results=remove_column(remove_column(results, -3), -2)
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_individuals', db=db, json=json), 'individual']
+            if session.get('html', None) =='image':
+                return redirect(url_for('get_images', db=db, json=json))
+            else:
+                #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
+                return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[columns, remove_column(display_results, 'L')], plus=['all/web', 'yes'],db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/individuals/all', methods=['GET'])
-def get_individuals_all(db):
+@app.route('/<db>/api/1.1/individual/all/<json>', methods=['GET'])
+def get_individuals_all(db, json):
     icolumns=get_columns_from_table('individual')
     columns=list(icolumns[1:]+tuple(['samples']))
     curs = mysql.connection.cursor()
@@ -920,20 +1037,33 @@ def get_individuals_all(db):
         i.date_collected, i.collection_method, i.collection_details, i.father_id, i.mother_id, i.changed, i.latest")
         iresults=curs.fetchall()
     except:
-        flash ("Error: unable to fetch individuals")
-        curs.close()
-    new_columns, display_results= change_for_display(list([tuple(columns)]), list(iresults))
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_individuals', db=db), 'individual']
-    if session.get('html', None) =='image':
-        return redirect(url_for('get_images', db=db))
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch individuals")
+    curs.close()
+    if len(iresults)==0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no individual data available in the database '"+db+"'")
+            return redirect(session['query'][0])
     else:
-        #for classical display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
-        return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['.', 'no'],db=db, crumbs=crumbs)
+        new_columns, display_results= change_for_display(list([tuple(columns)]), list(iresults))
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L')))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_individuals', db=db, json=json), 'individual']
+            if session.get('html', None) =='image':
+                return redirect(url_for('get_images', db=db, json=json))
+            else:
+                #for classical display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
+                return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['/'+db+'/api/1.1/individual/web', 'no'],db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/lane/<l_id>', methods=['GET'])
-def get_lane_per_lane_id(l_id, db):
+@app.route('/<db>/api/1.1/lane/<l_id>/<json>', methods=['GET'])
+def get_lane_per_lane_id(l_id, db, json):
     results=[]
     lane_acc_dic={}
     lcolumns=get_columns_from_table('lane')
@@ -943,27 +1073,40 @@ def get_lane_per_lane_id(l_id, db):
         curs.execute("SELECT distinct l.*, s.name FROM lane l join sample s on s.sample_id=l.sample_id where l.latest=1 and l.sample_id = '%s';" % l_id)
         lresults=curs.fetchall()
     except:
-        flash ("Error: unable to fetch lanes")
-    for row in lresults:
-        lane_acc_dic[row[7]]=row[1]
-        l_results=[row[1]]+[row[7]]+[row[6]]+list(row[3:6])+list(row[8:-1])
-        results.append(tuple(l_results))
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch lanes")
     curs.close()
-    new_column, display_results= change_for_display([columns], results)
-    new_columns= list(new_column)
-    new_columns[0][5]='library_accession'
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if len(session['query']) > 1:
-        session['breadcrumbs'].append(session.get('query', None))
-    if 'file' in list_crumbs:
-        crumbs.pop()
-    session['query']=[url_for('get_lane_per_lane_id', l_id=l_id, db=db), 'file']
-    for_display='lane accession (lane_id) = '+str(lane_acc_dic)[1:-1].replace(",", "),").replace(": ", " (")+")"
-    return render_template("mysql.html", title='Query was: lane(s) where ' +for_display, url_param=['file', 0], results=[new_columns[0], display_results], plus=['',''], db=db, crumbs=crumbs)
+    if len(lresults)==0:
+        if json == 'json':
+            return jsonify({"Data error":"no lane associated with criteria provided"})
+        else:
+            flash ("Error: no lane associated with criteria provided")
+            return redirect(session['query'][0])
+    else:
+        for row in lresults:
+            lane_acc_dic[row[7]]=row[1]
+            l_results=[row[1]]+[row[7]]+[row[6]]+list(row[3:6])+list(row[8:-1])
+            results.append(tuple(l_results))
+        new_column, display_results= change_for_display([columns], results)
+        new_columns= list(new_column)
+        new_columns[0][5]='library_accession'
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0], display_results))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if len(session['query']) > 1:
+                session['breadcrumbs'].append(session.get('query', None))
+            if 'file' in list_crumbs:
+                crumbs.pop()
+            session['query']=[url_for('get_lane_per_lane_id', l_id=l_id, db=db, json=json), 'file']
+            for_display='lane accession (lane_id) = '+str(lane_acc_dic)[1:-1].replace(",", "),").replace(": ", " (")+")"
+            return render_template("mysql.html", title='Query was: lane(s) where ' +for_display, url_param=['file', 0, '/web'], results=[new_columns[0], display_results], plus=['',''], db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/lanes/', methods=['GET'])
-def get_lanes(db):
+@app.route('/<db>/api/1.1/lane/<json>', methods=['GET'])
+def get_lanes(db, json):
     lcolumns=get_columns_from_table('lane')
     columns=tuple([lcolumns[1]])+tuple([lcolumns[6]])+tuple([lcolumns[2]])+tuple([lcolumns[3]]) +tuple([lcolumns[6]]) +tuple([lcolumns[7]]) + tuple(["files"])
     curs = mysql.connection.cursor()
@@ -973,16 +1116,29 @@ def get_lanes(db):
         l.seq_tech_id, l.library_id, l.accession")
         lresults=curs.fetchall()
     except:
-        flash ("Error: unable to fetch lanes")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch lanes")
     curs.close()
-    new_column, display_results= change_for_display([columns], list(lresults))
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_lanes', db=db), 'lane']
-    return render_template("mysql.html", title='Query was: all lanes', url_param=['lane', 0,], results=[new_column[0], display_results], plus =['all','yes'], db=db, crumbs=crumbs)
+    if len(lresults)==0:
+        if json == 'json':
+            return jsonify({"Data error":"no lane data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no lane data available in the database '"+db+"'")
+            return redirect(session['query'][0])
+    else:
+        new_column, display_results= change_for_display([columns], list(lresults))
+        if json == 'json':
+            return get_lanes_all(db=db, json=json)
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_lanes', db=db, json=json), 'lane']
+            return render_template("mysql.html", title='Query was: all lanes', url_param=['lane', 0, '/web'], results=[new_column[0], display_results], plus =['all/web','yes'], db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/lanes/all', methods=['GET'])
-def get_lanes_all(db):
+@app.route('/<db>/api/1.1/lane/all/<json>', methods=['GET'])
+def get_lanes_all(db, json):
     lcolumns=get_columns_from_table('lane')
     columns=[lcolumns[1]]+[lcolumns[6]]+list(lcolumns[2:6]) + list(lcolumns[7:] +tuple(["files"]))
     curs = mysql.connection.cursor()
@@ -992,16 +1148,28 @@ def get_lanes_all(db):
         l.seq_centre_id, l.library_id, l.accession,l.ss_qc_status, l.auto_qc_status, l.manually_withdrawn, l.run_date, l.changed, l.latest")
         lresults=curs.fetchall()
     except:
-        flash ("Error: unable to fetch lanes")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch lanes")
     curs.close()
-    new_column, display_results= change_for_display([columns], lresults)
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_lanes', db=db), 'lane']
-    return render_template("mysql.html", title='Query was: all lanes', url_param=['lane', 0], results=[new_column[0], display_results], plus =['.','no'], db=db, crumbs=crumbs)
+    if len(lresults)==0:
+        if json == 'json':
+            return jsonify({"Data error":"no lane data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no lane data available in the database '"+db+"'")
+            return redirect(session['query'][0])
+    else:
+        new_column, display_results= change_for_display([columns], lresults)
+        if json =='json':
+            return jsonify(tuple_to_dic(new_column[0], display_results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['query']=[url_for('get_lanes', db=db, json=json), 'lane']
+            return render_template("mysql.html", title='Query was: all lanes', url_param=['lane', 0, '/web'], results=[new_column[0], display_results], plus=['/'+db+'/api/1.1/lane/web','no'], db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/location/<loc_id>', methods=['GET'])
-def get_individual_per_location_id(loc_id, db):
+@app.route('/<db>/api/1.1/location/<loc_id>/<json>', methods=['GET'])
+def get_individual_per_location_id(loc_id, db, json):
     columns=get_columns_from_table('individual')[1:]
     results=[]
     list_loc_id ="("+loc_id+")"
@@ -1009,35 +1177,48 @@ def get_individual_per_location_id(loc_id, db):
     try:
         curs.execute("SELECT distinct i.*, l.location, l.sub_location FROM individual i join location l on i.location_id=l.location_id where l.location_id in %s and i.latest=1;" % list_loc_id)
         res=curs.fetchall()
-        iresults=remove_column(res, 1)
     except:
-        flash ("Error: unable to fetch individuals")
-    curs.close()
-    for row in iresults:
-        results.append(row[:15])
-        if row[-2] is not None:
-            loc_name=row[-2]
-        elif row[-1] is not None:
-            loc_name=row[-1]
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
-            loc_name=""
-    new_columns, display_results = change_for_display([columns[:15]], results)
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if 'location' not in list_crumbs:
-        session['breadcrumbs'].append(session.get('query', None))
-        session['query']=[url_for('get_individual_per_location_id', loc_id=loc_id, db=db), 'individual']
+            flash ("Error: unable to fetch individuals")
+    curs.close()
+    if len(res)==0:
+        if json == 'json':
+            return jsonify({"Data error":"no location associated with criteria provided"})
+        else:
+            flash ("Error: no location associated with criteria provided")
+            return redirect(session['query'][0])
     else:
-        if len(crumbs)==1 or len(crumbs)==3:
-            crumbs.pop()
-    if "," in list_loc_id:
-        for_display = "location = '"+session['name']+"'"
-    else:
-        for_display = "location (location_id) = '" + str(loc_name) +"' ("+str(loc_id)+")"
-    return render_template("mysql.html", title="Query was: individual(s) where "+ for_display, url_param=['location/'+str(loc_id)+'/individual', 0], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus =['',''], db=db, crumbs=crumbs)
+        l_results=remove_column(res, 1)
+        for row in l_results:
+            results.append(row[:15])
+            if row[-2] is not None:
+                loc_name=row[-2]
+            elif row[-1] is not None:
+                loc_name=row[-1]
+            else:
+                loc_name=""
+        new_columns, display_results = change_for_display([columns[:15]], results)
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L')))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if 'location' not in list_crumbs:
+                session['breadcrumbs'].append(session.get('query', None))
+                session['query']=[url_for('get_individual_per_location_id', loc_id=loc_id, db=db, json=json), 'individual']
+            else:
+                if len(crumbs)==1 or len(crumbs)==3:
+                    crumbs.pop()
+            if "," in list_loc_id:
+                for_display = "location = '"+session['name']+"'"
+            else:
+                for_display = "location (location_id) = '" + str(loc_name) +"' ("+str(loc_id)+")"
+            return render_template("mysql.html", title="Query was: individual(s) where "+ for_display, url_param=['location/'+str(loc_id)+'/individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus =['',''], db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/location/<loc_id>/individual/<ind_id>', methods=['GET'])
-def get_individual_per_id_and_per_location_id(loc_id, ind_id, db):
+@app.route('/<db>/api/1.1/location/<loc_id>/individual/<ind_id>/<json>', methods=['GET'])
+def get_individual_per_id_and_per_location_id(loc_id, ind_id, db, json):
     list_loc_id ="("+loc_id+")"
     loc_columns=get_columns_from_table('individual')
     columns=loc_columns[1:8]
@@ -1047,44 +1228,70 @@ def get_individual_per_id_and_per_location_id(loc_id, ind_id, db):
         join species S on S.species_id = I.species_id where L.location_id in {reg} and I.individual_id = '{indl}' ;". format(reg=list_loc_id, indl=ind_id))
         res=curs.fetchall()
     except:
-        flash ("Error: unable to fetch location and / or individual")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch location and / or individual")
     curs.close
-    results=tuple([x[1:8] for x in list(res)])
-    new_columns, display_results= change_for_display([columns], results)
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if 'individual' not in list_crumbs:
-        session['breadcrumbs'].append(session.get('query', None))
+    if len(res)==0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(session['query'][0])
     else:
-        crumbs.pop()
-        session['breadcrumbs'].append([url_for('get_individual_per_location_id', loc_id=loc_id, db=db), 'individual'])
-    session['query']=[url_for('get_individual_per_id_and_per_location_id', loc_id=loc_id, ind_id=ind_id, db=db), 'individual']
-    if "," in list_loc_id:
-        for_display="location name =  '"+res[0][-1] + "' and supplier_name (individual_id) = '"+res[0][2] +"' ("+str(ind_id)+")"
-    else:
-        for_display="location name (location_id) =  '"+res[0][-1] + "' ("+str(loc_id)+") and supplier_name (individual_id) = '"+res[0][2] +"' ("+str(ind_id)+")"
-    return render_template("mysql.html", title='Query was: individual(s) where '+for_display, url_param=['individual', 0], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus =['.',''], db=db, crumbs=crumbs)
+        results=tuple([x[1:8] for x in list(res)])
+        new_columns, display_results= change_for_display([columns], results)
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L')))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if 'individual' not in list_crumbs:
+                session['breadcrumbs'].append(session.get('query', None))
+            else:
+                crumbs.pop()
+                session['breadcrumbs'].append([url_for('get_individual_per_location_id', loc_id=loc_id, db=db, json=json), 'individual'])
+            session['query']=[url_for('get_individual_per_id_and_per_location_id', loc_id=loc_id, ind_id=ind_id, db=db, json=json), 'individual']
+            if "," in list_loc_id:
+                for_display="location name =  '"+res[0][-1] + "' and supplier_name (individual_id) = '"+res[0][2] +"' ("+str(ind_id)+")"
+            else:
+                for_display="location name (location_id) =  '"+res[0][-1] + "' ("+str(loc_id)+") and supplier_name (individual_id) = '"+res[0][2] +"' ("+str(ind_id)+")"
+            return render_template("mysql.html", title='Query was: individual(s) where '+for_display, url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus =['.',''], db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/location/name/<location>', methods=['GET'])
-def get_individual_per_location(location, db):
+@app.route('/<db>/api/1.1/location/name/<location>/<json>', methods=['GET'])
+def get_individual_per_location(location, db, json):
     loc_columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT distinct location_id from  location where location = '{loc}' or sub_location = '{loc}';". format(loc=location))
         res=curs.fetchall()
     except:
-        flash ("Error: unable to fetch location")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch location")
     curs.close()
-    list_loc_id=",".join([str(x[0]) for x in res])
-    crumbs=[[url_for('db_index', db=db), db]]
-    crumbs.append([url_for('get_location', db=db), 'location'])
-    session['breadcrumbs']=crumbs
-    session['query']=[url_for('get_individual_per_location', location=location, db=db), 'individual']
-    if len(res) > 1: session['name']=location
-    return(redirect(url_for('get_individual_per_location_id', loc_id=list_loc_id, db=db)))
+    if len(res)==0:
+        if json == 'json':
+            return jsonify({"Data error":"no location associated with criteria provided"})
+        else:
+            flash ("Error: no location associated with criteria provided")
+            return redirect(session['query'][0])
+    else:
+        list_loc_id=",".join([str(x[0]) for x in res])
+        if json=='json':
+            return get_individual_per_location_id(loc_id=list_loc_id, db=db, json=json)
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            crumbs.append([url_for('get_location', db=db, json=json), 'location'])
+            session['breadcrumbs']=crumbs
+            session['query']=[url_for('get_individual_per_location', location=location, db=db, json=json), 'individual']
+            if len(res) > 1: session['name']=location
+            return(redirect(url_for('get_individual_per_location_id', loc_id=list_loc_id, db=db, json=json)))
 
-@app.route('/<db>/api/1.1/location/name/<location>/individual/name/<ind_name>', methods=['GET'])
-def get_individual_per_name_and_per_location(location, ind_name, db):
+@app.route('/<db>/api/1.1/location/name/<location>/individual/name/<ind_name>/<json>', methods=['GET'])
+def get_individual_per_name_and_per_location(location, ind_name, db, json):
     loc_columns=get_columns_from_table('individual')
     columns=loc_columns[1:8]
     ind_list=ind_name.replace(" ","").replace(",", "','")
@@ -1094,507 +1301,31 @@ def get_individual_per_name_and_per_location(location, ind_name, db):
         join species S on S.species_id = I.species_id where L.location = '{reg}' and (I.name in ('{indl}') or I.alias in ('{indl}')) ;". format(reg=location, indl=ind_list))
         res=curs.fetchall()
     except:
-        flash ("Error: unable to fetch location and / or individual")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch location and / or individual")
     curs.close
     if len(res) == 0:
-        flash ("Error: unable to fetch individual with the location provided")
-        return redirect(url_for('db_index', db=db))
+        if json=='json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
     else:
         results=[x[1:8] for x in list(res)]
         new_columns, display_results= change_for_display([columns], results)
-        crumbs=session.get('breadcrumbs', None)
-        if len(crumbs) > 1:
-            crumbs.pop()
-        session['query']=[url_for('get_individual_per_name_and_per_location', location=location, ind_name=ind_name, db=db), 'individual']
-        return render_template("mysql.html", title='Query was: individual(s) where location = "'+ location +'" and individual name = "'+ind_name+'"', url_param=['individual', 0], results=[tuple(new_columns[0][:-1]), remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
+        if json == 'json':
+            return jsonify(tuple_to_dic(tuple(new_columns[0][:-1]), remove_column(display_results, 'L')))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            if len(crumbs) > 1:
+                crumbs.pop()
+            session['query']=[url_for('get_individual_per_name_and_per_location', location=location, ind_name=ind_name, db=db, json=json), 'individual']
+            return render_template("mysql.html", title='Query was: individual(s) where location = "'+ location +'" and individual name = "'+ind_name+'"', url_param=['individual', 0, '/web'], results=[tuple(new_columns[0][:-1]), remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
 
-@app.route('/<db>/api/1.1/location/name/<location>/species/name/<sp_name>', methods=['GET'])
-def get_species_per_name_and_per_location(location, sp_name, db):
-    loc_columns=get_columns_from_table('individual')
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct I.* FROM individual I join location L on L.location_id = I.location_id \
-        join species S on S.species_id = I.species_id where I.latest=1 and L.location = '{reg}' and (S.name like '%%{spn}%%' or S.common_name like '%%{spn}%%');". format(reg=location, spn=sp_name))
-        res=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch location and / or species")
-    curs.close()
-    results=list([x[1:8] for x in list(res)])
-    new_columns, display_results= change_for_display([loc_columns[1:8]], results)
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_species_per_name_and_per_location', location=location, sp_name=sp_name, db=db), 'individual']
-    return render_template("mysql.html", title='Query was: individual(s) where location = "'+ location +'" and species like "'+sp_name+'"', url_param=['individual', 0], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/locations', methods=['GET'])
-def get_location(db):
-    loc_columns=get_columns_from_table('location')
-    columns=list(loc_columns)+["individuals", "species"]
-    results=[]
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("select distinct l.location_id, l.country_of_origin, l.location, l.sub_location, l.latitude, l.longitude, \
-        count(distinct i.individual_id), count(distinct i.species_id) from location l join individual i on l.location_id = i.location_id \
-        where  i.latest = 1 group by l.location_id, l.country_of_origin, l.location, l.sub_location, l.latitude, l.longitude")
-        l_results=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch locations")
-    for row in l_results:
-        row=['' if x is None else x for x in row]
-        results.append(row)
-    curs.close()
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_location', db=db), 'location']
-    return render_template("mysql.html", title='Query was: all locations', url_param=['location',0], results=[columns,results], plus =['.',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/material/<m_id>', methods=['GET'])
-def get_material_per_material_id(m_id, db):
-    scolumns=get_columns_from_table('sample')
-    columns=tuple([scolumns[1]]+[scolumns[5]]+["individual_id"]+list(scolumns[2:5])+list(scolumns[6:]) +list(["files"]))
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct s.sample_id, s.name, s.material_id, s.accession, s.ssid, s.public_name, s.changed, s.latest, \
-        count(distinct f.file_id) from sample s join lane l on l.sample_id=s.sample_id join file f on f.lane_id=l.lane_id where \
-        s.latest=1 and f.latest=1 and s.material_id = '%s' group by s.sample_id, s.name, s.material_id, s.accession, s.ssid, s.public_name, s.changed, \
-        s.latest;" % m_id)
-        sresults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch sample")
-    try:
-        curs.execute("SELECT distinct individual_id FROM material where material_id = '%s' ;" % m_id)
-        iresults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch individual")
-    results=tuple(sresults[0][:3]+tuple([iresults[0][0]])+sresults[0][3:])
-    curs.close
-    new_columns, display_results= change_for_display([columns], [results])
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if 'sample' not in list_crumbs:
-        session['breadcrumbs'].append(session.get('query', None))
-    else:
-        crumbs.pop()
-    session['query']=[url_for('get_material_per_material_id', m_id=m_id, db=db), 'sample']
-    for_display = "'"+display_results[0][3] + "' ("+str(m_id)+")"
-    session["name"] = display_results[0][3]
-    return render_template("mysql.html", title='Query was: material name (material_id) = '+for_display, url_param=['material/'+str(m_id)+'/sample',0], results=[new_columns[0], display_results], plus=['.',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/material/<m_id>/sample/<s_id>', methods=['GET'])
-def get_material_per_material_id_and_sample_id(m_id, s_id, db):
-    lcolumns=get_columns_from_table('lane')
-    columns=[lcolumns[1]]+[lcolumns[6]]+list(lcolumns[2:6]) +[lcolumns[7]] + list(lcolumns[12:] +tuple(["files"]))
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("select distinct l.lane_id,l.name,l.sample_id, l.seq_tech_id, l.seq_centre_id, l.library_id, l.accession, l.changed, l.latest, \
-        count(distinct f.file_id) from lane l join file f on f.lane_id=l.lane_id where l.latest=1 and f.latest=1 and l.sample_id = '%s' group by l.lane_id,l.name,l.sample_id, l.seq_tech_id, \
-        l.seq_centre_id, l.library_id, l.accession, l.changed, l.latest;" % s_id)
-        lresults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch lane")
-    curs.close
-    new_columns, display_results= change_for_display([columns], lresults)
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if 'lane' not in list_crumbs:
-        session['breadcrumbs'].append(session.get('query', None))
-        session['query']=[url_for('get_material_per_material_id_and_sample_id', m_id=m_id, s_id=s_id, db=db), 'lane']
-    else:
-        crumbs.pop()
-    for_display="material name (material_id) = '"+session["name"]+"' (" +str(m_id)+") and sample name (sample_id)=  '"+display_results[0][2]+"' ("+str(s_id)+")"
-    return render_template("mysql.html", title='Query was: material = '+for_display, url_param=['file',0], results=[new_columns[0], display_results], plus=['.',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/materials/', methods=['GET'])
-def get_material(db):
-    scolumns=get_columns_from_table('material')
-    columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[9]])+tuple([scolumns[12]])+scolumns[13:14]+tuple(["samples"])
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct m.material_id, m.name, m.individual_id, m.accession, m.type, m.developmental_stage_id, \
-        m.organism_part_id, count(distinct s.sample_id) FROM material m join sample s on s.material_id=m.material_id \
-        where m.latest=1 and s.latest=1 group by m.material_id, m.name, m.individual_id, m.accession, m.developmental_stage_id, \
-        m.type, m.organism_part_id")
-        results=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch materials")
-    curs.close
-    new_columns, display_results= change_for_display([columns], list(results))
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_material', db=db), 'material']
-    return render_template("mysql.html", title='Query was: all materials', url_param=['material',0], results=[new_columns[0], display_results], plus=['all', 'yes'], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/materials/all', methods=['GET'])
-def get_material_all(db):
-    scolumns=get_columns_from_table('material')
-    columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[12]])+scolumns[5:12]+scolumns[13:]+tuple(["samples"])
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct m.material_id, m.name, m.individual_id, m.accession, m.developmental_stage_id, m.provider_id, m.date_received, \
-        m.storage_condition, m.storage_location, m.type, m.volume, m.concentration, m.organism_part_id, m.changed, m.latest, \
-        count(distinct s.sample_id) FROM material m join sample s on s.material_id=m.material_id where s.latest=1 group by m.material_id, \
-        m.name, m.individual_id, m.accession, m.developmental_stage_id, m.provider_id, m.date_received, m.storage_condition, m.storage_location, \
-        m.type, m.volume, m.concentration, m.organism_part_id, m.changed, m.latest")
-        results=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch materials")
-    curs.close
-    new_columns, display_results= change_for_display([columns], list(results))
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_material', db=db), 'material']
-    return render_template("mysql.html", title='Query was: all materials', url_param=['material',0], results=[new_columns[0], display_results], plus=['.','no'], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/project/<p_id>', methods=['GET'])
-def get_project_per_project_id(p_id, db):
-    columns=get_columns_from_table('individual')
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("select distinct I.*, p.name FROM individual I join allocation a  on a.individual_id=i.individual_id join project p \
-        on p.project_id  = a.project_id and p.project_id ='%s' and I.latest=1" % p_id)
-        presults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch items")
-    curs.close()
-    columns = columns[1:7]
-    result=remove_column(presults, 1)
-    results=list([x[:6] for x in list(result)])
-    if len(results) == 0:
-        flash('Unknown project accession')
-        return redirect(url_for('db_index', db=db))
-    new_columns, display_results= change_for_display([columns], results)
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if 'individual' not in list_crumbs:
-        crumbs.append([url_for('get_projects', db=db), 'project'])
-    else:
-        crumbs.pop()
-    session['query']=[url_for('get_project_per_project_id', p_id=p_id, db=db), 'individual']
-    for_display="project name (project_id)= '"+presults[0][-1]+"' ("+str(p_id)+")"
-    return render_template("mysql.html", title='Query was: individual(s) where '+for_display, url_param=['project/'+str(p_id)+'/individual',  0 ], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''],db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/project/<p_id>/individual/<i_id>', methods=['GET'])
-def get_individual_per_project_id_and_individual_id(p_id, i_id, db):
-    results=[]
-    columns=get_columns_from_table('individual')
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct i.*, p.name FROM individual i left join allocation a on a.individual_id=i.individual_id left join project p \
-        on p.project_id=a.project_id WHERE i.individual_id  = '{i_id}' and latest=1 and p.project_id = '{p_id}';". format(i_id=i_id, p_id=p_id))
-        presults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch items")
-    curs.close()
-    columns = columns[1:7]
-    result=remove_column(presults, 1)
-    results=tuple([x[:6] for x in list(result)])
-    if len(results) == 0:
-        flash('Unknown project accession')
-        return redirect(url_for('db_index', db=db))
-    new_columns, display_results= change_for_display([columns], results)
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if 'individual' not in list_crumbs:
-        session['breadcrumbs'].append(session.get('query', None))
-    else:
-        crumbs.pop()
-        crumbs.append([url_for('get_project_per_project_id', p_id=p_id, db=db), 'individual'])
-    session['query']=[url_for('get_individual_per_project_id_and_individual_id', p_id=p_id, i_id=i_id, db=db), 'individual']
-    for_display="project name (project_id) = '"+presults[0][-1]+"' ("+str(p_id)+ ") and supplier_name (individual_id) = '" +display_results[0][1]+"' ("+str(i_id)+")"
-    return render_template("mysql.html", title='Query was: individual(s) where '+for_display, url_param=['individual', 0], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/project/name/<accession>', methods=['GET'])
-def get_project_per_accession(accession, db):
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct project_id FROM project WHERE accession = '%s';" % accession)
-        results=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch items")
-    curs.close()
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs']=crumbs
-    session['query']=[url_for('db_index', db=db), db]
-    return(redirect(url_for('get_project_per_project_id', p_id=results[0][0], db=db)))
-
-@app.route('/<db>/api/1.1/project/name/<accession>/individual/name/<ind_name>', methods=['GET'])
-def get_individual_per_project_accession_and_name(accession, ind_name, db):
-    result=[]
-    ind_list=ind_name.replace(" ","").replace(",", "','")
-    columns=get_columns_from_table('individual')
-    curs = mysql.connection.cursor()
-    try:
-        query=("SELECT * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
-        where p.project_id  = a.project_id and p.accession = '{acc}') and (individual.name in ('{i_list}') or individual.alias in ('{i_list}')) and latest=1;". format(acc=accession, i_list=ind_list))
-        curs.execute(query)
-        result=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch items")
-    curs.close()
-    if len(result) == 0:
-        flash('Unknown project accession or individual name')
-        return redirect(url_for('db_index', db=db))
-    results=[x[1:7] for x in list(result)]
-    new_columns, display_results= change_for_display([columns[1:7]], results)
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_individual_per_project_accession_and_name', accession=accession, ind_name=ind_name, db=db), 'individual']
-    return render_template("mysql.html", title='Query was: individual(s) where project_accession = "'+accession+'" & individual_name = "'+ind_name +'"', url_param=['individual', 0], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/project/name/<accession>/location/name/<location>', methods=['GET'])
-def get_project_per_accession_and_location(accession, location, db):
-    loc_columns=get_columns_from_table('individual')
-    columns=loc_columns[1:8]
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct I.* FROM individual I join location L on L.location_id = I.location_id \
-        join species S on S.species_id = I.species_id \
-        left outer join allocation A on A.individual_id=I.individual_id \
-        left outer join project P on P.project_id=A.project_id \
-        where L.location = '{reg}' and P.accession = '{acc}'". format(reg=location, acc=accession))
-        res=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch location and / or project accession")
-    curs.close()
-    if len(res) >0:
-        results=[x[1:8] for x in list(res)]
-        new_columns, display_results= change_for_display([columns], results)
-        display_results=remove_column(display_results, 'L')
-        crumbs=[[url_for('db_index', db=db), db]]
-        session['breadcrumbs'] = crumbs
-        session['query']=[url_for('get_project_per_accession_and_location', accession=accession, location=location, db=db),'individual']
-        return render_template("mysql.html", title='Query was: individual(s) where location = "'+ location +'" and project_accession = "'+accession+'"', url_param=['individual', 0], results=[new_columns[0][:-1], display_results], plus=['',''], db=db, crumbs=crumbs)
-    else:
-        flash ("Error: unable to fetch individual with the location or project accession provided")
-        return redirect(url_for('db_index', db=db))
-
-@app.route('/<db>/api/1.1/project/name/<accession>/species/name/<sp_name>', methods=['GET'])
-def get_individual_per_project_accession_and_species(accession, sp_name, db):
-    results=()
-    columns=get_columns_from_table('individual')
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
-        where p.project_id  = a.project_id and p.accession = '{acc}') and species_id in (select species_id from species where \
-         name like '%%{spn}%%' or common_name like '%%{spn}%%') and latest=1;". format(acc=accession, spn=sp_name))
-        result=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch items")
-    curs.close()
-    if len(result) == 0:
-        flash('Unknown project accession, species name or no corresponding results')
-        return redirect(url_for('db_index', db=db))
-    results=tuple([x[1:7] for x in list(result)])
-    new_columns, display_results = change_for_display([columns[1:7]], results)
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_individual_per_project_accession_and_species', accession=accession, sp_name=sp_name, db=db),'individual']
-    return render_template("mysql.html", title='Query was: individual(s) where project_id = "'+accession+'" & species like = "'+sp_name+'"', url_param=['individual', 0], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/projects', methods=['GET'])
-def get_projects(db):
-    columns=get_columns_from_table('project')
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("select p.project_id, p.name, p.alias, p.accession, p.ssid, count(distinct a.individual_id), count(distinct species_id) from project p \
-        JOIN allocation a on p.project_id=a.project_id join individual i on i.individual_id=a.individual_id where i.latest=1 group by p.project_id, p.name, \
-        p.alias, p.accession, p.ssid")
-        presults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch projects")
-    curs.close()
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_projects', db=db), 'projects']
-    return render_template("mysql.html", title='Query was: all projects', url_param=['project', 0], results=[columns+tuple(['individuals', 'species']),presults], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/provider/<p_id>', methods=['GET'])
-def get_individual_by_provider(p_id, db):
-    columns=get_columns_from_table('individual')
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct i.*, p.provider_name FROM individual i right join provider p on p.provider_id=i.provider_id where i.latest=1 and p.provider_id ='%s';" % p_id)
-        result=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch individual")
-    curs.close()
-    results=tuple([x[1:7] for x in list(result) if x[1] is not None])
-    new_columns, display_results = change_for_display([columns[1:7]], results)
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if 'individual' not in list_crumbs:
-        crumbs.append(session.get('query', None))
-    else:
-        crumbs.pop()
-    session['query']=[url_for('get_individual_by_provider', p_id=p_id, db=db), 'individual']
-    return render_template("mysql.html", title='Query was: individuals from provider ="' + result[0][-1]+'"', url_param=['individual', 0], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/providers/', methods=['GET'])
-def get_provider(db):
-    pcolumns=get_columns_from_table('provider')
-    columns=pcolumns[:2]+tuple([pcolumns[4]])+tuple(["individuals", 'species'])
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("select distinct p.provider_id, p.provider_name, p.affiliation, \
-        count(distinct i.individual_id), count(distinct i.species_id) from provider p join individual i on i.provider_id=p.provider_id \
-        where p.latest=1 and i.latest=1 group by p.provider_id, p.provider_name, p.affiliation")
-        results=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch provider")
-    curs.close()
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_provider', db=db), 'provider']
-    return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0 ], results=[columns,results], plus=['all','yes'], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/providers/all', methods=['GET'])
-def get_provider_all(db):
-    pcolumns=get_columns_from_table('provider')
-    columns=pcolumns+tuple(["individuals", 'species'])
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("select distinct p.provider_id, p.provider_name, p.email, p.affiliation, p.address, p.phone, p.changed, p.latest, \
-        count(distinct i.individual_id), count(distinct i.species_id) from provider p join individual i on i.provider_id=p.provider_id \
-        where i.latest=1 group by p.provider_id, p.provider_name, p.email, p.affiliation, p.address, p.phone, p.changed, p.latest")
-        results=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch provider")
-    curs.close()
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_provider', db=db), 'provider']
-    return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0 ], results=[columns,results], plus=['.','no'], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/sample/<s_id>', methods=['GET'])
-def get_sample_per_sample_id(s_id, db):
-    results=[]
-    scolumns=get_columns_from_table('lane')
-    col=tuple(list(scolumns[1:2])+["individual_id"]+["sample_id"]+list(scolumns[3:8])+list(scolumns[12:]))
-    updated_col=col+tuple(["files"])
-    columns=updated_col
-    list_s_id ="("+s_id+")"
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct * FROM lane where sample_id in %s ;" % list_s_id)
-        sresults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch lanes")
-    try:
-        curs.execute("SELECT distinct m.individual_id, s.name, s.sample_id FROM material m left join sample s on m.material_id=s.material_id where s.sample_id in %s ;" % list_s_id)
-        iresults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch individual")
-    if len(sresults) > 0:
-        for index in range(0, len(sresults)):
-            row=sresults[index]
-            try:
-                curs.execute("SELECT count(distinct file_id) from file where lane_id = '%s';" % row[0])
-                id_return=curs.fetchall()
-            except:
-                flash ("Error: unable to fetch items")
-            id_results=list(row[1:2])+[iresults[index][0]]+[iresults[index][2]]+list(row[3:8])+list(row[12:])+[id_return[0][0]]
-            results.append(tuple(id_results))
-    else:
-        flash("no lane associated with this sample_id")
-        return redirect(url_for('db_index', db=db))
-    curs.close()
-    columns, results= change_for_display([columns], results)
-    crumbs=[[url_for('db_index', db=db), db]]
-    crumbs.append([url_for('get_samples', db=db), 'sample'])
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_sample_per_sample_id', s_id=s_id, db=db), 'lane']
-    dicj=dict(remove_column(iresults, 1))
-    for_display="sample name (sample_id) = "+str(dicj)[1:-1].replace(",", "),").replace(": ", " (")+")"
-    return render_template("mysql.html", title='Query was: lane(s) fwhere '+for_display, url_param=['file', 0], results=[columns[0],results], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/sample/<s_id>/lane/<l_id>', methods=['GET'])
-def get_lane_per_sample_id_and_lane_id(s_id, l_id, db):
-    results=[]
-    sample_dic={}
-    lcolumns=get_columns_from_table('lane')
-    columns=tuple([lcolumns[1]]+[lcolumns[7]]+[lcolumns[6]]+list(lcolumns[3:6])+list(lcolumns[8:]))
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct l.*, s.name FROM lane l join sample s on s.sample_id=l.sample_id where l.latest=1 and l.lane_id = '%s';" % l_id)
-        lresults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch lanes")
-    for row in lresults:
-        sample_dic[row[-1]]=row[2]
-        l_results=[row[1]]+[row[7]]+[row[6]]+list(row[3:6])+list(row[8:-1])
-        results.append(l_results)
-    curs.close()
-    new_column, display_results= change_for_display([columns], results)
-    new_columns=list(new_column)
-    new_columns[0][5]='library_accession'
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if 'file' in list_crumbs:
-        crumbs.pop(list_crumbs.index('file'))
-    if 'lane' not in list_crumbs:
-        crumbs.append([url_for('get_sample_per_sample_id', s_id=s_id, db=db), 'lane'])
-    session['breadcrumbs']=crumbs
-    session['query']=[url_for('get_lane_per_sample_id_and_lane_id', s_id=s_id, l_id=l_id, db=db), 'file']
-    for_display="sample name (sample_id)= '" + str(sample_dic)[1:-1].replace(": ", " (")+")"
-    return render_template("mysql.html", title='Query was: lane(s) where '+for_display, url_param=['file', 0], results=[new_columns[0], tuple(display_results)], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/sample/name/<sname>', methods=['GET'])
-def get_samples_by_name(sname, db):
-    s_list=sname.replace(" ","").replace(",", "','")
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct sample_id FROM sample where latest=1 and name in ('{slist}') or accession in ('{slist}');".format(slist=s_list))
-        sresults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch samples")
-    curs.close()
-    if len(sresults) == 0:
-        flash("no sample associated with this/these sample name(s)")
-        return redirect(url_for('db_index', db=db))
-    else:
-        crumbs=[[url_for('db_index', db=db), db]]
-        session['breadcrumbs']=crumbs
-        session['query']=[url_for('db_index', db=db), db]
-        list_sample_id=",".join([str(x[0]) for x in sresults])
-        return(redirect(url_for('get_sample_per_sample_id', s_id=list_sample_id, db=db)))
-
-@app.route('/<db>/api/1.1/sample/name/<sname>/individual/name/<ind_name>', methods=['GET'])
-def get_samples_by_sample_name_and_individual_name(sname, ind_name, db):
-    s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
-    ind_list=ind_name.replace(" ","").replace(",", "','")
-    results=[]
-    scolumns=get_columns_from_table('sample')
-    col=tuple([scolumns[1]]+[scolumns[5]]+["supplier_name"]+list(scolumns[3:4])+list(scolumns[6:]))
-    updated_col=col
-    columns=tuple(updated_col)
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("select distinct s.* from sample s join material m on m.material_id = s.material_id join individual i on i.individual_id=m.individual_id where s.latest=1 and (i.name in ('{ind_list}') \
-         or i.alias in ('{ind_list}')) and (s.accession in {s_list} or s.name in {s_list});".format(ind_list=ind_list, s_list=s_list))
-        sresults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch samples with these criteria")
-    if len(sresults) > 0:
-        for row in sresults:
-            try:
-                curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
-                id_return=curs.fetchall()
-            except:
-                flash ("Error: unable to fetch items")
-            id_results=[row[1]]+[row[5]]+[id_return[0][0]]+list(row[3:4])+list(row[6:])
-            results.append(tuple(id_results))
-            m_name=id_return[0][2]
-        curs.close()
-    else:
-        flash("no sample associated with this/these sample name(s)")
-        return redirect(url_for('db_index', db=db))
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_samples_by_sample_name_and_individual_name', sname=sname, ind_name=ind_name, db=db), 'individual']
-    return render_template("mysql.html", title="Query was: sample(s) where sample_name  = " +s_list+" and individual_name = '"+ind_name+"'", url_param=['lane', 0], results=[columns,results], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/sample/name/<sname>/location/name/<location>', methods=['GET'])
-def get_samples_by_sample_name_and_location(sname, location, db):
+@app.route('/<db>/api/1.1/location/name/<location>/sample/name/<sname>/<json>', methods=['GET'])
+def get_samples_by_sample_name_and_location(sname, location, db, json):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]
     scolumns=get_columns_from_table('sample')
@@ -1608,28 +1339,442 @@ def get_samples_by_sample_name_and_location(sname, location, db):
         and (s.accession in {s_list} or s.name in {s_list}) and l.location='{loc}';".format(loc=location, s_list=s_list))
         sresults=curs.fetchall()
     except:
-        flash ("Error: unable to fetch samples with these criteria")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch samples with these criteria")
     if len(sresults) > 0:
         for row in sresults:
             try:
                 curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
                 id_return=curs.fetchall()
             except:
-                flash ("Error: unable to fetch items")
+                if json=='json':
+                    return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+                else:
+                    flash ("Error: unable to fetch items")
             id_results=[row[1]]+[row[5]]+[id_return[0][0]]+list(row[3:4])+list(row[6:])
             results.append(tuple(id_results))
             m_name=id_return[0][2]
-        curs.close()
+            curs.close()
+        if json == 'json':
+            return jsonify(tuple_to_dic(columns,results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_samples_by_sample_name_and_location', sname=sname, location=location, db=db, json=json), 'sample']
+            return render_template("mysql.html", title="Query was: sample(s) where sample_name  = " +s_list+" and location ='"+location+"'", url_param=['lane', 0, '/web'], results=[columns,results], plus=['',''], db=db, crumbs=crumbs)
     else:
-        flash("no sample associated with this/these sample name(s) and location")
-        return redirect(url_for('db_index', db=db))
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_samples_by_sample_name_and_location', sname=sname, location=location, db=db), 'sample']
-    return render_template("mysql.html", title="Query was: sample(s) where sample_name  = " +s_list+" and location ='"+location+"'", url_param=['lane', 0], results=[columns,results], plus=['',''], db=db, crumbs=crumbs)
+        curs.close()
+        if json=='json':
+            return jsonify({"Data error":"no sample associated with criteria provided"})
+        else:
+            flash("no sample associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
 
-@app.route('/<db>/api/1.1/sample/name/<sname>/project/name/<accession>', methods=['GET'])
-def get_samples_by_sample_name_and_project(sname, accession, db):
+@app.route('/<db>/api/1.1/location/name/<location>/species/name/<sp_name>/<json>', methods=['GET'])
+def get_species_per_name_and_per_location(location, sp_name, db, json):
+    loc_columns=get_columns_from_table('individual')
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct I.* FROM individual I join location L on L.location_id = I.location_id \
+        join species S on S.species_id = I.species_id where I.latest=1 and L.location = '{reg}' and (S.name like '%%{spn}%%' or S.common_name like '%%{spn}%%');". format(reg=location, spn=sp_name))
+        res=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch location and / or species")
+    curs.close()
+    if len(res) == 0:
+        if json=='json':
+            return jsonify({"Data error":"no species associated with criteria provided"})
+        else:
+            flash ("Error: no species associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        results=list([x[1:8] for x in list(res)])
+        new_columns, display_results= change_for_display([loc_columns[1:8]], results)
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L')))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_species_per_name_and_per_location', location=location, sp_name=sp_name, db=db, json=json), 'individual']
+            return render_template("mysql.html", title='Query was: individual(s) where location = "'+ location +'" and species like "'+sp_name+'"', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/location/<json>', methods=['GET'])
+def get_location(db, json):
+    loc_columns=get_columns_from_table('location')
+    columns=list(loc_columns)+["individuals", "species"]
+    results=[]
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("select distinct l.location_id, l.country_of_origin, l.location, l.sub_location, l.latitude, l.longitude, \
+        count(distinct i.individual_id), count(distinct i.species_id) from location l join individual i on l.location_id = i.location_id \
+        where  i.latest = 1 group by l.location_id, l.country_of_origin, l.location, l.sub_location, l.latitude, l.longitude limit 5")
+        l_results=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch locations")
+    curs.close()
+    if len(l_results) == 0:
+        if json=='json':
+            return jsonify({"Data error":"no location data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no location data available in the database '"+db+"'")
+            return redirect(url_for('db_index', db=db))
+    else:
+        for row in l_results:
+            row=['' if x is None else x for x in row]
+            row[4]=str(row[4])
+            row[5]=str(row[5])
+            results.append(row)
+        if json == 'json':
+            return jsonify(tuple_to_dic(columns, results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_location', db=db, json=json), 'location']
+            return render_template("mysql.html", title='Query was: all locations', url_param=['location',0, '/web'], results=[columns,results], plus =['.',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/material/<m_id>/<json>', methods=['GET'])
+def get_material_per_material_id(m_id, db, json):
+    scolumns=get_columns_from_table('sample')
+    columns=tuple([scolumns[1]]+[scolumns[5]]+["individual_id"]+list(scolumns[2:5])+list(scolumns[6:]) +list(["files"]))
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct s.sample_id, s.name, s.material_id, s.accession, s.ssid, s.public_name, s.changed, s.latest, \
+        count(distinct f.file_id) from sample s join lane l on l.sample_id=s.sample_id join file f on f.lane_id=l.lane_id where \
+        s.latest=1 and f.latest=1 and s.material_id = '%s' group by s.sample_id, s.name, s.material_id, s.accession, s.ssid, s.public_name, s.changed, \
+        s.latest;" % m_id)
+        sresults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch sample")
+    if len(sresults) == 0 :
+        curs.close()
+        if json=='json':
+            return jsonify({"Data error":"no sample associated with criteria provided"})
+        else:
+            flash ("Error: no sample associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        try:
+            curs.execute("SELECT distinct individual_id FROM material where material_id = '%s' ;" % m_id)
+            iresults=curs.fetchall()
+        except:
+            if json=='json':
+                return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+            else:
+                flash ("Error: unable to fetch individual")
+        results=tuple(sresults[0][:3]+tuple([iresults[0][0]])+sresults[0][3:])
+        curs.close
+        new_columns, display_results= change_for_display([columns], [results])
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0], display_results))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if 'sample' not in list_crumbs:
+                session['breadcrumbs'].append(session.get('query', None))
+            else:
+                crumbs.pop()
+            session['query']=[url_for('get_material_per_material_id', m_id=m_id, db=db, json=json), 'sample']
+            for_display = "'"+display_results[0][3] + "' ("+str(m_id)+")"
+            session["name"] = display_results[0][3]
+            return render_template("mysql.html", title='Query was: material name (material_id) = '+for_display, url_param=['material/'+str(m_id)+'/sample',0, '/web'], results=[new_columns[0], display_results], plus=['.',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/material/<m_id>/sample/<s_id>/<json>', methods=['GET'])
+def get_material_per_material_id_and_sample_id(m_id, s_id, db, json):
+    lcolumns=get_columns_from_table('lane')
+    columns=[lcolumns[1]]+[lcolumns[6]]+list(lcolumns[2:6]) +[lcolumns[7]] + list(lcolumns[12:] +tuple(["files"]))
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("select distinct l.lane_id,l.name,l.sample_id, l.seq_tech_id, l.seq_centre_id, l.library_id, l.accession, l.changed, l.latest, \
+        count(distinct f.file_id) from lane l join file f on f.lane_id=l.lane_id where l.latest=1 and f.latest=1 and l.sample_id = '%s' group by l.lane_id,l.name,l.sample_id, l.seq_tech_id, \
+        l.seq_centre_id, l.library_id, l.accession, l.changed, l.latest;" % s_id)
+        lresults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch lane")
+    try:
+        curs.execute("select material_id, sample_id from sample where latest = 1 and material_id = '%s';" % m_id)
+        mresults=curs.fetchall()
+    except:
+        flash ("Error: unable to fetch sample data")
+    curs.close
+    if len(lresults) == 0 or len(mresults) == 0:
+        if json=='json':
+            return jsonify({"Data error":"no lane associated with criteria provided"})
+        else:
+            flash ("Error: no lane associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        new_columns, display_results= change_for_display([columns], lresults)
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0], display_results))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if 'lane' not in list_crumbs:
+                session['breadcrumbs'].append(session.get('query', None))
+                session['query']=[url_for('get_material_per_material_id_and_sample_id', m_id=m_id, s_id=s_id, db=db, json=json), 'lane']
+            else:
+                crumbs.pop()
+            for_display="material name (material_id) = '"+session["name"]+"' (" +str(m_id)+") and sample name (sample_id)=  '"+display_results[0][2]+"' ("+str(s_id)+")"
+            return render_template("mysql.html", title='Query was: material = '+for_display, url_param=['file',0, '/web'], results=[new_columns[0], display_results], plus=['.',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/material/<json>', methods=['GET'])
+def get_material(db, json):
+    scolumns=get_columns_from_table('material')
+    columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[9]])+tuple([scolumns[12]])+scolumns[13:14]+tuple(["samples"])
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct m.material_id, m.name, m.individual_id, m.accession, m.type, m.developmental_stage_id, \
+        m.organism_part_id, count(distinct s.sample_id) FROM material m join sample s on s.material_id=m.material_id \
+        where m.latest=1 and s.latest=1 group by m.material_id, m.name, m.individual_id, m.accession, m.developmental_stage_id, \
+        m.type, m.organism_part_id")
+        results=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch materials")
+    curs.close
+    if len(results) == 0 :
+        if json=='json':
+            return jsonify({"Data error":"no material data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no material data available in the database '"+db+"'")
+            return redirect(url_for('db_index', db=db))
+    else:
+        new_columns, display_results= change_for_display([columns], list(results))
+        if json == 'json':
+            return get_material_all(db=db, json=json)
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_material', db=db, json=json), 'material']
+            return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_columns[0], display_results], plus=['all/web', 'yes'], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/material/all/<json>', methods=['GET'])
+def get_material_all(db, json):
+    scolumns=get_columns_from_table('material')
+    columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[12]])+scolumns[5:12]+scolumns[13:]+tuple(["samples"])
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct m.material_id, m.name, m.individual_id, m.accession, m.developmental_stage_id, m.provider_id, m.date_received, \
+        m.storage_condition, m.storage_location, m.type, m.volume, m.concentration, m.organism_part_id, m.changed, m.latest, \
+        count(distinct s.sample_id) FROM material m join sample s on s.material_id=m.material_id where s.latest=1 group by m.material_id, \
+        m.name, m.individual_id, m.accession, m.developmental_stage_id, m.provider_id, m.date_received, m.storage_condition, m.storage_location, \
+        m.type, m.volume, m.concentration, m.organism_part_id, m.changed, m.latest")
+        results=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch materials")
+    curs.close
+    if len(results) == 0 :
+        if json=='json':
+            return jsonify({"Data error":"no material data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no material data available in the database '"+db+"'")
+            return redirect(url_for('db_index', db=db))
+    else:
+        new_columns, display_results= change_for_display([columns], list(results))
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0], display_results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_material', db=db, json=json), 'material']
+            return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_columns[0], display_results], plus=['/'+db+'/api/1.1/material/web','no'], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/project/<p_id>/<json>', methods=['GET'])
+def get_project_per_project_id(p_id, db, json):
+    columns=get_columns_from_table('individual')
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("select distinct I.*, p.name FROM individual I join allocation a  on a.individual_id=i.individual_id join project p \
+        on p.project_id  = a.project_id and p.project_id ='%s' and I.latest=1" % p_id)
+        presults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch items")
+    curs.close()
+    if len(presults) == 0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(session['query'][0])
+    else:
+        columns = columns[1:7]
+        result=remove_column(presults, 1)
+        results=list([x[:6] for x in list(result)])
+        new_columns, display_results= change_for_display([columns], results)
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L')))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if 'individual' not in list_crumbs:
+                crumbs.append([url_for('get_projects', db=db, json=json), 'project'])
+            else:
+                crumbs.pop()
+            session['query']=[url_for('get_project_per_project_id', p_id=p_id, db=db, json=json), 'individual']
+            for_display="project name (project_id)= '"+presults[0][-1]+"' ("+str(p_id)+")"
+            return render_template("mysql.html", title='Query was: individual(s) where '+for_display, url_param=['project/'+str(p_id)+'/individual',  0, '/web' ], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''],db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/project/<p_id>/individual/<i_id>/<json>', methods=['GET'])
+def get_individual_per_project_id_and_individual_id(p_id, i_id, db, json):
+    results=[]
+    columns=get_columns_from_table('individual')
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct i.*, p.name FROM individual i left join allocation a on a.individual_id=i.individual_id left join project p \
+        on p.project_id=a.project_id WHERE i.individual_id  = '{i_id}' and latest=1 and p.project_id = '{p_id}';". format(i_id=i_id, p_id=p_id))
+        presults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch items")
+    curs.close()
+    if len(presults) == 0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        columns = columns[1:7]
+        result=remove_column(presults, 1)
+        results=tuple([x[:6] for x in list(result)])
+        new_columns, display_results= change_for_display([columns], results)
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L')))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if 'individual' not in list_crumbs:
+                session['breadcrumbs'].append(session.get('query', None))
+            else:
+                crumbs.pop()
+                crumbs.append([url_for('get_project_per_project_id', p_id=p_id, db=db, json=json), 'individual'])
+            session['query']=[url_for('get_individual_per_project_id_and_individual_id', p_id=p_id, i_id=i_id, db=db, json=json), 'individual']
+            for_display="project name (project_id) = '"+presults[0][-1]+"' ("+str(p_id)+ ") and supplier_name (individual_id) = '" +display_results[0][1]+"' ("+str(i_id)+")"
+            return render_template("mysql.html", title='Query was: individual(s) where '+for_display, url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/project/name/<accession>/<json>', methods=['GET'])
+def get_project_per_accession(accession, db, json):
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct project_id FROM project WHERE accession = '%s';" % accession)
+        results=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch items")
+    curs.close()
+    if len(results) == 0:
+        if json == 'json':
+            return jsonify({"Data error":"no project associated with criteria provided"})
+        else:
+            flash ("Error: no project associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        if json=='json':
+            return get_project_per_project_id(p_id=results[0][0], db=db, json=json)
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs']=crumbs
+            session['query']=[url_for('db_index', db=db), db]
+            return(redirect(url_for('get_project_per_project_id', p_id=results[0][0], db=db, json=json)))
+
+@app.route('/<db>/api/1.1/project/name/<accession>/individual/name/<ind_name>/<json>', methods=['GET'])
+def get_individual_per_project_accession_and_name(accession, ind_name, db, json):
+    result=[]
+    ind_list=ind_name.replace(" ","").replace(",", "','")
+    columns=get_columns_from_table('individual')
+    curs = mysql.connection.cursor()
+    try:
+        query=("SELECT * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
+        where p.project_id  = a.project_id and p.accession = '{acc}') and (individual.name in ('{i_list}') or individual.alias in ('{i_list}')) and latest=1;". format(acc=accession, i_list=ind_list))
+        curs.execute(query)
+        result=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch items")
+    curs.close()
+    if len(result) == 0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        results=[x[1:7] for x in list(result)]
+        new_columns, display_results= change_for_display([columns[1:7]], results)
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L')))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_individual_per_project_accession_and_name', accession=accession, ind_name=ind_name, db=db, json=json), 'individual']
+            return render_template("mysql.html", title='Query was: individual(s) where project_accession = "'+accession+'" & individual_name = "'+ind_name +'"', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/project/name/<accession>/location/name/<location>/<json>', methods=['GET'])
+def get_project_per_accession_and_location(accession, location, db, json):
+    loc_columns=get_columns_from_table('individual')
+    columns=loc_columns[1:8]
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct I.* FROM individual I join location L on L.location_id = I.location_id \
+        join species S on S.species_id = I.species_id \
+        left outer join allocation A on A.individual_id=I.individual_id \
+        left outer join project P on P.project_id=A.project_id \
+        where L.location = '{reg}' and P.accession = '{acc}'". format(reg=location, acc=accession))
+        res=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch location and / or project accession")
+    curs.close()
+    if len(res) >0:
+        results=[x[1:8] for x in list(res)]
+        new_columns, display_results= change_for_display([columns], results)
+        display_results=remove_column(display_results, 'L')
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], display_results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_project_per_accession_and_location', accession=accession, location=location, db=db, json=json),'individual']
+            return render_template("mysql.html", title='Query was: individual(s) where location = "'+ location +'" and project_accession = "'+accession+'"', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], display_results], plus=['',''], db=db, crumbs=crumbs)
+    else:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+
+@app.route('/<db>/api/1.1/project/name/<accession>/sample/name/<sname>/<json>', methods=['GET'])
+def get_samples_by_sample_name_and_project(sname, accession, db, json):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]
     scolumns=get_columns_from_table('sample')
@@ -1644,28 +1789,658 @@ def get_samples_by_sample_name_and_project(sname, accession, db):
     and p.accession='{acc}';".format(acc=accession, s_list=s_list))
         sresults=curs.fetchall()
     except:
-        flash ("Error: unable to fetch samples with these criteria")
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch samples with these criteria")
     if len(sresults) > 0:
         for row in sresults:
             try:
                 curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
                 id_return=curs.fetchall()
             except:
-                flash ("Error: unable to fetch items")
+                if json=='json':
+                    return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+                else:
+                    flash ("Error: unable to fetch items")
             id_results=[row[1]]+[row[5]]+[id_return[0][0]]+list(row[3:4])+list(row[6:])
             results.append(tuple(id_results))
             m_name=id_return[0][2]
         curs.close()
+        if json == 'json':
+            return jsonify(tuple_to_dic(columns,results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_samples_by_sample_name_and_project', sname=sname, accession=accession, db=db, json=json), 'sample']
+            for_display="in " + s_list
+            if "," not in s_list:
+                for_display="= " + s_list[1:-1]
+            return render_template("mysql.html", title="Query was: sample(s) where sample_name " +for_display+ " and project = '"+accession+"'", url_param=['lane', 0, '/web'], results=[columns,results], plus=['',''], db=db, crumbs=crumbs)
     else:
-        flash("no sample associated with this/these sample name(s) and project accession")
-        return redirect(url_for('db_index', db=db))
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_samples_by_sample_name_and_project', sname=sname, accession=accession, db=db), 'sample']
-    return render_template("mysql.html", title="Query was: sample(s) where sample_name  = " +s_list+ " and project = '"+accession+"'", url_param=['lane', 0], results=[columns,results], plus=['',''], db=db, crumbs=crumbs)
+        curs.close()
+        if json == 'json':
+            return jsonify({"Data error":"no sample associated with criteria provided"})
+        else:
+            flash ("Error: no sample associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
 
-@app.route('/<db>/api/1.1/sample/name/<sname>/species/name/<sp_name>', methods=['GET'])
-def get_samples_by_sample_name_and_species(sname, sp_name, db):
+@app.route('/<db>/api/1.1/project/name/<accession>/species/name/<sp_name>/<json>', methods=['GET'])
+def get_individual_per_project_accession_and_species(accession, sp_name, db, json):
+    results=()
+    columns=get_columns_from_table('individual')
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct * FROM individual WHERE individual_id in (select individual_id from allocation a join project p \
+        where p.project_id  = a.project_id and p.accession = '{acc}') and species_id in (select species_id from species where \
+         name like '%%{spn}%%' or common_name like '%%{spn}%%') and latest=1;". format(acc=accession, spn=sp_name))
+        result=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch items")
+    curs.close()
+    if len(result) == 0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        results=tuple([x[1:7] for x in list(result)])
+        new_columns, display_results = change_for_display([columns[1:7]], results)
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L')))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_individual_per_project_accession_and_species', accession=accession, sp_name=sp_name, db=db, json=json),'individual']
+            return render_template("mysql.html", title='Query was: individual(s) where project_id = "'+accession+'" & species like = "'+sp_name+'"', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/project/<json>', methods=['GET'])
+def get_projects(db, json):
+    columns=get_columns_from_table('project')
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("select p.project_id, p.name, p.alias, p.accession, p.ssid, count(distinct a.individual_id), count(distinct species_id) from project p \
+        JOIN allocation a on p.project_id=a.project_id join individual i on i.individual_id=a.individual_id where i.latest=1 group by p.project_id, p.name, \
+        p.alias, p.accession, p.ssid")
+        presults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch projects")
+    curs.close()
+    if len(presults) == 0 :
+        if json=='json':
+            return jsonify({"Data error":"no project data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no project data available in the database '"+db+"'")
+            return redirect(url_for('db_index', db=db))
+    else:
+        if json == 'json':
+            return jsonify(tuple_to_dic(columns+tuple(['individuals', 'species']),presults))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_projects', db=db, json=json), 'projects']
+            return render_template("mysql.html", title='Query was: all projects', url_param=['project', 0, '/web'], results=[columns+tuple(['individuals', 'species']),presults], plus=['',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/provider/<p_id>/<json>', methods=['GET'])
+def get_individual_by_provider(p_id, db, json):
+    columns=get_columns_from_table('individual')
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct i.*, p.provider_name FROM individual i right join provider p on p.provider_id=i.provider_id where i.latest=1 and p.provider_id ='%s';" % p_id)
+        result=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch individual")
+    curs.close()
+    if len(result) == 0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        results=tuple([x[1:7] for x in list(result) if x[1] is not None])
+        new_columns, display_results = change_for_display([columns[1:7]], results)
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L')))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if 'individual' not in list_crumbs:
+                crumbs.append(session.get('query', None))
+            else:
+                crumbs.pop()
+            session['query']=[url_for('get_individual_by_provider', p_id=p_id, db=db, json=json), 'individual']
+            return render_template("mysql.html", title='Query was: individuals from provider ="' + result[0][-1]+'"', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/provider/<json>', methods=['GET'])
+def get_provider(db, json):
+    pcolumns=get_columns_from_table('provider')
+    columns=pcolumns[:2]+tuple([pcolumns[4]])+tuple(["individuals", 'species'])
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("select distinct p.provider_id, p.provider_name, p.affiliation, \
+        count(distinct i.individual_id), count(distinct i.species_id) from provider p join individual i on i.provider_id=p.provider_id \
+        where p.latest=1 and i.latest=1 group by p.provider_id, p.provider_name, p.affiliation")
+        results=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch provider")
+    curs.close()
+    if len(results) == 0 :
+        if json=='json':
+            return jsonify({"Data error":"no provider data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no provider data available in the database '"+db+"'")
+            return redirect(url_for('db_index', db=db))
+    else:
+        if json == 'json':
+            return get_provider_all(db=db, json=json)
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_provider', db=db, json=json), 'provider']
+            return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0, '/web' ], results=[columns,results], plus=['all/web','yes'], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/provider/all/<json>', methods=['GET'])
+def get_provider_all(db, json):
+    pcolumns=get_columns_from_table('provider')
+    columns=pcolumns+tuple(["individuals", 'species'])
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("select distinct p.provider_id, p.provider_name, p.email, p.affiliation, p.address, p.phone, p.changed, p.latest, \
+        count(distinct i.individual_id), count(distinct i.species_id) from provider p join individual i on i.provider_id=p.provider_id \
+        where i.latest=1 group by p.provider_id, p.provider_name, p.email, p.affiliation, p.address, p.phone, p.changed, p.latest")
+        results=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch provider")
+    curs.close()
+    if len(results) == 0 :
+        if json=='json':
+            return jsonify({"Data error":"no provider data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no provider data available in the database '"+db+"'")
+            return redirect(url_for('db_index', db=db))
+    else:
+        if json == 'json':
+            return jsonify(tuple_to_dic(columns,results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_provider', db=db, json=json), 'provider']
+            return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0 , '/web'], results=[columns,results], plus=['/'+db+'/api/1.1/provider/web','no'], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/sample/<s_id>/<json>', methods=['GET'])
+def get_sample_per_sample_id(s_id, db, json):
+    results=[]
+    scolumns=get_columns_from_table('lane')
+    col=tuple(list(scolumns[1:2])+["individual_id"]+["sample_id"]+list(scolumns[3:8])+list(scolumns[12:]))
+    updated_col=col+tuple(["files"])
+    columns=updated_col
+    list_s_id ="("+s_id+")"
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct * FROM lane where sample_id in %s ;" % list_s_id)
+        sresults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to8 database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch lanes")
+    try:
+        curs.execute("SELECT distinct m.individual_id, s.name, s.sample_id FROM material m left join sample s on m.material_id=s.material_id where s.sample_id in %s ;" % list_s_id)
+        iresults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to7 database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch individual")
+    if len(sresults) > 0:
+        for index in range(0, len(sresults)):
+            row=sresults[index]
+            try:
+                curs.execute("SELECT count(file_id) from file where lane_id = %s;" % row[1])
+                file_return=curs.fetchall()
+            except:
+                if json=='json':
+                    return jsonify({"Connection error":"could not connect dd database "+db+" or unknown url parameters"})
+                else:
+                    flash ("Error: unable to fetch items")
+            id_results=list(row[1:2])+[iresults[index][0]]+[iresults[index][2]]+list(row[3:8])+list(row[12:])+[file_return[0][0]]
+            results.append(tuple(id_results))
+        curs.close()
+        columns, results= change_for_display([columns], results)
+        if json == 'json':
+            return jsonify(tuple_to_dic(columns[0],results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            crumbs.append([url_for('get_samples', db=db, json=json), 'sample'])
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_sample_per_sample_id', s_id=s_id, db=db, json=json), 'lane']
+            dicj=dict(remove_column(iresults, 1))
+            for_display="sample name (sample_id) = "+str(dicj)[1:-1].replace(",", "),").replace(": ", " (")+")"
+            return render_template("mysql.html", title='Query was: lane(s) fwhere '+for_display, url_param=['file', 0, '/web'], results=[columns[0],results], plus=['',''], db=db, crumbs=crumbs)
+    else:
+        curs.close()
+        if json == 'json':
+            return jsonify({"Data error":"no lane associated with criteria provided"})
+        else:
+            flash ("Error: no lane associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+
+@app.route('/<db>/api/1.1/sample/<s_id>/lane/<l_id>/<json>', methods=['GET'])
+def get_lane_per_sample_id_and_lane_id(s_id, l_id, db, json):
+    results=[]
+    sample_dic={}
+    lcolumns=get_columns_from_table('lane')
+    columns=tuple([lcolumns[1]]+[lcolumns[7]]+[lcolumns[6]]+list(lcolumns[3:6])+list(lcolumns[8:]))
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct l.*, s.name FROM lane l join sample s on s.sample_id=l.sample_id where l.latest=1 and l.lane_id = '%s';" % l_id)
+        lresults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch lanes")
+    curs.close()
+    if len(lresults) == 0:
+        if json == 'json':
+            return jsonify({"Data error":"no lane associated with criteria provided"})
+        else:
+            flash ("Error: no lane associated with criteria provided")
+    else:
+        for row in lresults:
+            sample_dic[row[-1]]=row[2]
+            l_results=[row[1]]+[row[7]]+[row[6]]+list(row[3:6])+list(row[8:-1])
+            results.append(l_results)
+        new_column, display_results= change_for_display([columns], results)
+        new_columns=list(new_column)
+        new_columns[0][5]='library_accession'
+        if json=='json':
+            return jsonify(tuple_to_dic(new_columns[0], tuple(display_results)))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if 'file' in list_crumbs:
+                crumbs.pop(list_crumbs.index('file'))
+            if 'lane' not in list_crumbs:
+                crumbs.append([url_for('get_sample_per_sample_id', s_id=s_id, db=db, json=json), 'lane'])
+            session['breadcrumbs']=crumbs
+            session['query']=[url_for('get_lane_per_sample_id_and_lane_id', s_id=s_id, l_id=l_id, db=db, json=json), 'file']
+            for_display="sample name (sample_id)= '" + str(sample_dic)[1:-1].replace(": ", " (")+")"
+            return render_template("mysql.html", title='Query was: lane(s) where '+for_display, url_param=['file', 0, '/web'], results=[new_columns[0], tuple(display_results)], plus=['',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/sample/name/<sname>/<json>', methods=['GET'])
+def get_samples_by_name(sname, db, json):
+    s_list=sname.replace(" ","").replace(",", "','")
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct sample_id FROM sample where latest=1 and name in ('{slist}') or accession in ('{slist}');".format(slist=s_list))
+        sresults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connecat to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch samples")
+    curs.close()
+    if len(sresults) == 0:
+        if json == 'json':
+            return jsonify({"Data error":"no sample associated with criteria provided"})
+        else:
+            flash ("Error: no sample associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        list_sample_id=",".join([str(x[0]) for x in sresults])
+        if json=='json':
+            return get_sample_per_sample_id(s_id=list_sample_id, db=db, json=json)
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs']=crumbs
+            session['query']=[url_for('db_index', db=db), db]
+            return(redirect(url_for('get_sample_per_sample_id', s_id=list_sample_id, db=db, json=json)))
+
+@app.route('/<db>/api/1.1/sample/name/<sname>/individual/name/<ind_name>/<json>', methods=['GET'])
+def get_samples_by_sample_name_and_individual_name(sname, ind_name, db, json):
+    s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
+    ind_list=ind_name.replace(" ","").replace(",", "','")
+    results=[]
+    scolumns=get_columns_from_table('sample')
+    col=tuple([scolumns[1]]+[scolumns[5]]+["supplier_name"]+list(scolumns[3:4])+list(scolumns[6:]))
+    updated_col=col
+    columns=tuple(updated_col)
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("select distinct s.* from sample s join material m on m.material_id = s.material_id join individual i on i.individual_id=m.individual_id where s.latest=1 and (i.name in ('{ind_list}') \
+         or i.alias in ('{ind_list}')) and (s.accession in {s_list} or s.name in {s_list});".format(ind_list=ind_list, s_list=s_list))
+        sresults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch samples with these criteria")
+    if len(sresults) > 0:
+        for row in sresults:
+            try:
+                curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
+                id_return=curs.fetchall()
+            except:
+                if json=='json':
+                    return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+                else:
+                    flash ("Error: unable to fetch items")
+            id_results=[row[1]]+[row[5]]+[id_return[0][0]]+list(row[3:4])+list(row[6:])
+            results.append(tuple(id_results))
+            m_name=id_return[0][2]
+        curs.close()
+        if json=='json':
+            return jsonify(tuple_to_dic(columns,results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_samples_by_sample_name_and_individual_name', sname=sname, ind_name=ind_name, db=db, json=json), 'individual']
+            return render_template("mysql.html", title="Query was: sample(s) where sample_name  = " +s_list+" and individual_name = '"+ind_name+"'", url_param=['lane', 0, '/web'], results=[columns,results], plus=['',''], db=db, crumbs=crumbs)
+    else:
+        curs.close()
+        if json == 'json':
+            return jsonify({"Data error":"no sample associated with criteria provided"})
+        else:
+            flash ("Error: no sample associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+
+@app.route('/<db>/api/1.1/sample/<json>', methods=['GET'])
+def get_samples(db, json):
+    results=[]
+    scolumns=get_columns_from_table('sample')
+    col=tuple([scolumns[1]]+[scolumns[5]]+["individual_id"]+list(scolumns[3:4])+list(scolumns[6:]) +list(["files"]))
+    updated_col=col
+    columns=tuple(updated_col)
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("select distinct s.sample_id, s.material_id, s.accession, s.ssid, s.name, s.public_name, s.changed, s.latest, count(distinct f.file_id) \
+         from sample s join lane l on l.sample_id=s.sample_id join file f on f.lane_id=l.lane_id where s.latest=1 and f.latest=1 group by \
+         s.sample_id, s.material_id, s.accession, s.ssid, s.name, s.public_name, s.changed, s.latest")
+        sresults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch samples")
+    if len(sresults) == 0:
+        curs.close()
+        if json=='json':
+            return jsonify({"Data error":"no sample data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no sample data available in the database '"+db+"'")
+            return redirect(url_for('db_index', db=db))
+    else:
+        for row in sresults:
+            try:
+                curs.execute("SELECT distinct i.individual_id from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s' ;" % row[1])
+                id_return=curs.fetchall()
+            except:
+                if json=='json':
+                    return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+                else:
+                    flash ("Error: unable to fetch items")
+            id_results=[row[0]]+[row[4]]+[id_return[0][0]]+list(row[2:3])+list(row[5:])
+            results.append(tuple(id_results))
+        curs.close()
+        new_columns, display_results= change_for_display([columns], results)
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0],display_results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_samples', db=db, json=json), 'sample']
+            return render_template("mysql.html", title='Query was: all samples', url_param=['sample', 0, '/web'], results=[new_columns[0],display_results], plus=['',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/species/<sp_id>/<json>', methods=['GET'])
+def get_species_per_species_id(sp_id, db, json):
+    columns=get_columns_from_table('individual')[1:8]
+    results=[]
+    curs = mysql.connection.cursor()
+    list_sp_id ="("+sp_id+")"
+    try:
+        curs.execute("SELECT distinct i.*, s.name FROM individual i join species s on i.species_id=s.species_id where i.latest=1 and s.species_id in %s;" % list_sp_id)
+        sresults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch individuals")
+            return redirect(url_for('db_index', db=db))
+    curs.close
+    if len(sresults) == 0:
+        if json=='json':
+            return jsonify({"Data error":"no species associated with criteria provided"})
+        else:
+            flash ("Error: no species associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        for row in sresults:
+            s_results=list(row)[1:8]
+            sname=row[-1]
+            results.append(tuple(s_results))
+        new_columns, display_results = change_for_display(list([columns]), list(results))
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L')))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if 'species' not in list_crumbs:
+                crumbs.append(session.get('query', None))
+            else:
+                crumbs.pop()
+            if isinstance(session['query'], str):
+                sname="like '"+session['query']+"'"
+            else:
+                sname="= '"+str(sname)+"'"
+            session['query']=[url_for('get_species_per_species_id', sp_id=sp_id, db=db, json=json), 'individual']
+            if "," in list_sp_id:
+                for_display = "species name like '" + session['name']+"'"
+            else:
+                for_display = "species name (species_id) " + sname + " ("+str(sp_id)+")"
+                session['name']=""
+            return render_template("mysql.html", title='Query was: individual(s) where ' +for_display, url_param=['species/'+str(sp_id)+'/individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/species/<sp_id>/individual/<i_id>/<json>', methods=['GET'])
+def get_individual_per_species_id_and_individual_id(sp_id, i_id, db, json):
+    columns=get_columns_from_table('individual')[1:8]
+    results=[]
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct * FROM individual where latest=1 and individual_id = '{ind}' and species_id = '{sp}';". format(ind=i_id, sp=sp_id))
+        sresults=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch individuals")
+            return redirect(url_for('db_index', db=db))
+    curs.close
+    if len(sresults) == 0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        for row in sresults:
+            s_results=list(row)[1:8]
+            results.append(s_results)
+        new_columns, display_results = change_for_display([columns], tuple(results))
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L')))
+        else:
+            crumbs=session.get('breadcrumbs', None)
+            list_crumbs=[x[-1] for x in crumbs]
+            if 'individual' not in list_crumbs:
+                crumbs.append(session.get('query', None))
+            else:
+                crumbs.pop()
+                crumbs.append([url_for('get_species_per_species_id', sp_id=sp_id, db=db, json=json), 'individual'])
+            if "," in sp_id:
+                for_display = "species name like '" + session['name']+"'"
+                session['query']=[url_for('get_individual_per_species_id_and_individual_id', sp_id=sp_id, i_id=i_id, db=db, json=json), 'individual']
+            else:
+                for_display = "species name (species_id) = '" + display_results[0][3] +"' ("+str(sp_id) +")"
+                session['query']=[url_for('get_individual_per_species_id_and_individual_id', sp_id=sp_id, i_id=i_id, db=db, json=json), 'individual']
+            for_display+=" and individual name (individual_id) = '"+sresults[0][2] +"' ("+str(i_id)+")"
+            return render_template("mysql.html", title='Query was: individual(s) where '+for_display, url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/species/<json>', methods=['GET'])
+def get_species(db, json):
+    scolumns=get_columns_from_table('species')
+    columns=scolumns[1:6]+tuple([scolumns[9]])+tuple(["individuals"])
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("select distinct s.species_id, s.name, s.strain, s.taxon_id, s.common_name, s.taxon_position, count(distinct i.individual_id) \
+        from species s join individual i on i.species_id=s.species_id  where s.latest=1 and i.latest=1 group by s.species_id, s.name, s.strain, \
+        s.taxon_id, s.common_name, s.taxon_position")
+        results=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch species")
+            return redirect(url_for('db_index', db=db))
+    curs.close()
+    if len(results) == 0 :
+        if json=='json':
+            return jsonify({"Data error":"no species data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no species data available in the database '"+db+"'")
+            return redirect(url_for('db_index', db=db))
+    else:
+        new_columns, display_results= change_for_display(list([columns]), list(results))
+        if json == 'json':
+            return get_species_all(db=db, json=json)
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_species', db=db, json=json), 'species']
+            return render_template("mysql.html", title='Query was: all species', url_param=['species',0, '/web'], results=[new_columns[0], display_results], plus=['all/web', 'yes'], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/species/all/<json>', methods=['GET'])
+def get_species_all(db, json):
+    scolumns=get_columns_from_table('species')
+    columns=scolumns[1:]+tuple(["individuals"])
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("select distinct s.species_id, s.name, s.strain, s.taxon_id, s.common_name, \
+        s.karyotype, s.ploidy, s.family_id, s.taxon_position, s.genome_size, s.iucn, s.changed, s.latest, \
+        count(distinct i.individual_id) from species s join individual i on i.species_id=s.species_id \
+        where i.latest=1 group by s.species_id, s.name, s.strain, s.taxon_id, s.common_name, \
+        s.karyotype, s.ploidy, s.family_id, s.taxon_position, s.genome_size, s.iucn, s.changed, s.latest")
+        results=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch species")
+            return redirect(url_for('db_index', db=db))
+    curs.close()
+    if len(results) == 0 :
+        if json=='json':
+            return jsonify({"Data error":"no species data available in the database '"+db+"'"})
+        else:
+            flash ("Error: no species data available in the database '"+db+"'")
+            return redirect(url_for('db_index', db=db))
+    else:
+        new_columns, display_results= change_for_display(list([columns]), list(results))
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0], display_results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_species', db=db, json=json), 'species']
+            return render_template("mysql.html", title='Query was: all species', url_param=['species',0, '/web'], results=[new_columns[0], display_results], plus=['/'+db+'/api/1.1/species/web','no'], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/species/name/<sp_name>/<json>', methods=['GET'])
+def get_species_per_name(sp_name, db, json):
+    list_species_id=""
+    scolumns=get_columns_from_table('species')
+    columns=scolumns[1:6]+scolumns[9:]+tuple(["individuals"])
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("select distinct s.species_id from species s where s.latest=1 and (s.name like '%{spn}%' or s.common_name like '%{spn}%')".format(spn=sp_name))
+        results=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch species")
+            return redirect(url_for('db_index', db=db))
+    curs.close()
+    if len(results) == 0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        for row in results:
+            list_species_id+=","+str(row[0])
+        if json == 'json':
+            return get_species_per_species_id(sp_id=list_species_id[1:], db=db, json=json)
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_species', db=db, json=json), 'species']
+            session['name']=sp_name
+            return redirect(url_for('get_species_per_species_id', sp_id=list_species_id[1:], db=db, json=json))
+
+@app.route('/<db>/api/1.1/species/name/<sp_name>/individual/name/<ind_name>/<json>', methods=['GET'])
+def get_individual_per_name_and_species_name(ind_name, sp_name, db, json):
+    ind_list=ind_name.replace(" ","").replace(",", "','")
+    columns=get_columns_from_table('individual')
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct i.* FROM individual i join species s on i.species_id=s.species_id WHERE (s.name like '%%{spn}%%' or s.common_name like '%%{spn}%%') and (i.name in ('{i_l}') or i.alias in ('{i_l}'));". format(spn=sp_name, i_l=ind_list))
+        res=curs.fetchall()
+    except:
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch items")
+    curs.close()
+    if len(res) == 0:
+        if json == 'json':
+            return jsonify({"Data error":"no individual associated with criteria provided"})
+        else:
+            flash ("Error: no individual associated with criteria provided")
+            return redirect(url_for('db_index', db=db))
+    else:
+        results=[x[1:8] for x in list(res)]
+        new_columns, display_results = change_for_display([columns[1:8]], results)
+        #remove the thumbnail field for display
+        display_results=tuple([x[:-1] for x in list(display_results)])
+        session['query']=[]
+        if json == 'json':
+            return jsonify(tuple_to_dic(new_columns[0][:-1], display_results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_individual_per_name_and_species_name', ind_name=ind_name, sp_name=sp_name, db=db, json=json), 'individual']
+            return render_template("mysql.html", title='Query was : individual(s) where supplier_name = "'+str(ind_name)+'" & species like "'+str(sp_name)+ '"', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], display_results], plus=['',''], db=db, crumbs=crumbs)
+
+@app.route('/<db>/api/1.1/species/name/<sp_name>/sample/name/<sname>/<json>', methods=['GET'])
+def get_samples_by_sample_name_and_species(sname, sp_name, db, json):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]
     scolumns=get_columns_from_table('sample')
@@ -1679,210 +2454,38 @@ def get_samples_by_sample_name_and_species(sname, sp_name, db):
         and (s.accession in {s_list} or s.name in {s_list}) and (sp.name like '%{spn}%' or sp.common_name like '%{spn}%');".format(spn=sp_name, s_list=s_list))
         sresults=curs.fetchall()
     except:
-        flash ("Error: unable to fetch samples with these criteria")
-    if sresults:
-        if len(sresults) > 0:
-            for row in sresults:
-                try:
-                    curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
-                    id_return=curs.fetchall()
-                except:
-                    flash ("Error: unable to fetch items")
-                id_results=[row[1]]+[row[5]]+[id_return[0][0]]+list(row[3:4])+list(row[6:])
-                results.append(tuple(id_results))
-                m_name=id_return[0][2]
-            curs.close()
+        if json=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
-            flash("no sample associated with this/these sample name(s) and species")
+            flash ("Error: unable to fetch samples with these criteria")
+    if len(sresults) == 0:
+        curs.close()
+        if json == 'json':
+            return jsonify({"Data error":"no sample associated with criteria provided"})
+        else:
+            flash ("Error: no sample associated with criteria provided")
             return redirect(url_for('db_index', db=db))
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_samples_by_sample_name_and_species', sname=sname, sp_name=sp_name, db=db), 'sample']
-    return render_template("mysql.html", title="Query was: sample(s) where sample_name  = " +s_list+" and species like '"+sp_name+"'", url_param=['lane', 0], results=[columns,results], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/samples', methods=['GET'])
-def get_samples(db):
-    results=[]
-    scolumns=get_columns_from_table('sample')
-    col=tuple([scolumns[1]]+[scolumns[5]]+["individual_id"]+list(scolumns[3:4])+list(scolumns[6:]) +list(["files"]))
-    updated_col=col
-    columns=tuple(updated_col)
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("select distinct s.sample_id, s.material_id, s.accession, s.ssid, s.name, s.public_name, s.changed, s.latest, count(distinct f.file_id) \
-         from sample s join lane l on l.sample_id=s.sample_id join file f on f.lane_id=l.lane_id where s.latest=1 and f.latest=1 group by \
-         s.sample_id, s.material_id, s.accession, s.ssid, s.name, s.public_name, s.changed, s.latest")
-        sresults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch samples")
-    for row in sresults:
-        try:
-            curs.execute("SELECT distinct i.individual_id from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s' ;" % row[1])
-            id_return=curs.fetchall()
-        except:
-            flash ("Error: unable to fetch items")
-        id_results=[row[0]]+[row[4]]+[id_return[0][0]]+list(row[2:3])+list(row[5:])
-        results.append(tuple(id_results))
-    curs.close()
-    new_columns, display_results= change_for_display([columns], results)
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_samples', db=db), 'sample']
-    return render_template("mysql.html", title='Query was: all samples', url_param=['sample', 0], results=[new_columns[0],display_results], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/species/<sp_id>', methods=['GET'])
-def get_species_per_species_id(sp_id, db):
-    columns=get_columns_from_table('individual')[1:8]
-    results=[]
-    curs = mysql.connection.cursor()
-    list_sp_id ="("+sp_id+")"
-    try:
-        curs.execute("SELECT distinct i.*, s.name FROM individual i join species s on i.species_id=s.species_id where i.latest=1 and s.species_id in %s;" % list_sp_id)
-        sresults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch individuals")
-        return redirect(url_for('db_index', db=db))
-    curs.close
-    for row in sresults:
-        s_results=list(row)[1:8]
-        sname=row[-1]
-        results.append(tuple(s_results))
-    new_columns, display_results = change_for_display(list([columns]), list(results))
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if 'species' not in list_crumbs:
-        crumbs.append(session.get('query', None))
     else:
-        crumbs.pop()
-    if isinstance(session['query'], str):
-        sname="like '"+session['query']+"'"
-    else:
-        sname="= '"+str(sname)+"'"
-    session['query']=[url_for('get_species_per_species_id', sp_id=sp_id, db=db), 'individual']
-    if "," in list_sp_id:
-        for_display = "species name like '" + session['name']+"'"
-    else:
-        for_display = "species name (species_id) " + sname + " ("+str(sp_id)+")"
-        session['name']=""
-    return render_template("mysql.html", title='Query was: individual(s) where ' +for_display, url_param=['species/'+str(sp_id)+'/individual', 0], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/species/<sp_id>/individual/<i_id>', methods=['GET'])
-def get_individual_per_species_id_and_individual_id(sp_id, i_id, db):
-    columns=get_columns_from_table('individual')[1:8]
-    results=[]
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct * FROM individual where latest=1 and individual_id = '%s';" % i_id)
-        sresults=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch individuals")
-        return redirect(url_for('db_index', db=db))
-    curs.close
-    for row in sresults:
-        s_results=list(row)[1:8]
-        results.append(s_results)
-    new_columns, display_results = change_for_display([columns], tuple(results))
-    crumbs=session.get('breadcrumbs', None)
-    list_crumbs=[x[-1] for x in crumbs]
-    if 'individual' not in list_crumbs:
-        crumbs.append(session.get('query', None))
-    else:
-        crumbs.pop()
-        crumbs.append([url_for('get_species_per_species_id', sp_id=sp_id, db=db), 'individual'])
-    if "," in sp_id:
-        for_display = "species name like '" + session['name']+"'"
-        session['query']=[url_for('get_individual_per_species_id_and_individual_id', sp_id=sp_id, i_id=i_id, db=db), 'individual']
-    else:
-        for_display = "species name (species_id) = '" + display_results[0][3] +"' ("+str(sp_id) +")"
-        session['query']=[url_for('get_individual_per_species_id_and_individual_id', sp_id=sp_id, i_id=i_id, db=db), 'individual']
-    for_display+=" and individual name (individual_id) = '"+sresults[0][2] +"' ("+str(i_id)+")"
-    return render_template("mysql.html", title='Query was: individual(s) where '+for_display, url_param=['individual', 0], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['',''], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/species/', methods=['GET'])
-def get_species(db):
-    scolumns=get_columns_from_table('species')
-    columns=scolumns[1:6]+tuple([scolumns[9]])+tuple(["individuals"])
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("select distinct s.species_id, s.name, s.strain, s.taxon_id, s.common_name, s.taxon_position, count(distinct i.individual_id) \
-        from species s join individual i on i.species_id=s.species_id  where s.latest=1 and i.latest=1 group by s.species_id, s.name, s.strain, \
-        s.taxon_id, s.common_name, s.taxon_position")
-        results=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch species")
-        return redirect(url_for('db_index', db=db))
-    curs.close()
-    new_columns, display_results= change_for_display(list([columns]), list(results))
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_species', db=db), 'species']
-    return render_template("mysql.html", title='Query was: all species', url_param=['species',0], results=[new_columns[0], display_results], plus=['all', 'yes'], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/species/all', methods=['GET'])
-def get_all_species_all(db):
-    scolumns=get_columns_from_table('species')
-    columns=scolumns[1:]+tuple(["individuals"])
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("select distinct s.species_id, s.name, s.strain, s.taxon_id, s.common_name, \
-        s.karyotype, s.ploidy, s.family_id, s.taxon_position, s.genome_size, s.iucn, s.changed, s.latest, \
-        count(distinct i.individual_id) from species s join individual i on i.species_id=s.species_id \
-        where i.latest=1 group by s.species_id, s.name, s.strain, s.taxon_id, s.common_name, \
-        s.karyotype, s.ploidy, s.family_id, s.taxon_position, s.genome_size, s.iucn, s.changed, s.latest")
-        results=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch species")
-        return redirect(url_for('db_index', db=db))
-    curs.close()
-    new_columns, display_results= change_for_display(list([columns]), list(results))
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_species', db=db), 'species']
-    return render_template("mysql.html", title='Query was: all species', url_param=['species',0], results=[new_columns[0], display_results], plus=['.','no'], db=db, crumbs=crumbs)
-
-@app.route('/<db>/api/1.1/species/name/<sp_name>', methods=['GET'])
-def get_species_per_name(sp_name, db):
-    list_species_id=""
-    scolumns=get_columns_from_table('species')
-    columns=scolumns[1:6]+scolumns[9:]+tuple(["individuals"])
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("select distinct s.species_id from species s where s.latest=1 and (s.name like '%{spn}%' or s.common_name like '%{spn}%')".format(spn=sp_name))
-        results=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch species")
-        return redirect(url_for('db_index', db=db))
-    curs.close()
-    for row in results:
-        list_species_id+=","+str(row[0])
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_species', db=db), 'species']
-    session['name']=sp_name
-    return redirect(url_for('get_species_per_species_id', sp_id=list_species_id[1:], db=db))
-
-@app.route('/<db>/api/1.1/species/name/<sp_name>/individual/name/<ind_name>', methods=['GET'])
-def get_individual_per_name_and_species_name(ind_name, sp_name, db):
-    ind_list=ind_name.replace(" ","").replace(",", "','")
-    columns=get_columns_from_table('individual')
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct i.* FROM individual i join species s on i.species_id=s.species_id WHERE (s.name like '%%{spn}%%' or s.common_name like '%%{spn}%%') and (i.name in ('{i_l}') or i.alias in ('{i_l}'));". format(spn=sp_name, i_l=ind_list))
-        res=curs.fetchall()
-    except:
-        flash ("Error: unable to fetch items")
-    if len(res)==0:
-        flash('No individual with the criteria provided')
-        return redirect(url_for('db_index', db=db))
-    results=[x[1:8] for x in list(res)]
-    new_columns, display_results = change_for_display([columns[1:8]], results)
-    #remove the thumbnail field for display
-    display_results=tuple([x[:-1] for x in list(display_results)])
-    session['query']=[]
-    crumbs=[[url_for('db_index', db=db), db]]
-    session['breadcrumbs'] = crumbs
-    session['query']=[url_for('get_individual_per_name_and_species_name', ind_name=ind_name, sp_name=sp_name, db=db), 'individual']
-    return render_template("mysql.html", title='Query was : individual(s) where supplier_name = "'+str(ind_name)+'" & species like "'+str(sp_name)+ '"', url_param=['individual', 0], results=[new_columns[0][:-1], display_results], plus=['',''], db=db, crumbs=crumbs)
+        for row in sresults:
+            try:
+                curs.execute("SELECT distinct i.name, i.individual_id, m.name from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s';" % row[2])
+                id_return=curs.fetchall()
+            except:
+                if json=='json':
+                    return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+                else:
+                    flash ("Error: unable to fetch items")
+            id_results=[row[1]]+[row[5]]+[id_return[0][0]]+list(row[3:4])+list(row[6:])
+            results.append(tuple(id_results))
+            m_name=id_return[0][2]
+        curs.close()
+        if json == 'json':
+            return jsonify(tuple_to_dic(columns,results))
+        else:
+            crumbs=[[url_for('db_index', db=db), db]]
+            session['breadcrumbs'] = crumbs
+            session['query']=[url_for('get_samples_by_sample_name_and_species', sname=sname, sp_name=sp_name, db=db, json=json), 'sample']
+            return render_template("mysql.html", title="Query was: sample(s) where sample_name  = " +s_list+" and species like '"+sp_name+"'", url_param=['lane', 0, '/web'], results=[columns,results], plus=['',''], db=db, crumbs=crumbs)
 
 if __name__ == "__main__":
     app.run(debug=True)
