@@ -1998,29 +1998,29 @@ def get_sample_per_sample_id(s_id, db, json):
         sresults=curs.fetchall()
     except:
         if json=='json':
-            return jsonify({"Connection error":"could not connect to8 database "+db+" or unknown url parameters"})
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters1"})
         else:
             flash ("Error: unable to fetch lanes")
-    try:
-        curs.execute("SELECT distinct m.individual_id, s.name, s.sample_id FROM material m left join sample s on m.material_id=s.material_id where s.sample_id in %s ;" % list_s_id)
-        iresults=curs.fetchall()
-    except:
-        if json=='json':
-            return jsonify({"Connection error":"could not connect to7 database "+db+" or unknown url parameters"})
-        else:
-            flash ("Error: unable to fetch individual")
     if len(sresults) > 0:
         for index in range(0, len(sresults)):
             row=sresults[index]
+            try:
+                curs.execute("SELECT distinct m.individual_id, s.name, s.sample_id FROM material m left join sample s on m.material_id=s.material_id where s.sample_id = %s ;" % row[2])
+                iresults=curs.fetchall()
+            except:
+                if json=='json':
+                    return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters2"})
+                else:
+                    flash ("Error: unable to fetch individual")
             try:
                 curs.execute("SELECT count(file_id) from file where lane_id = %s;" % row[1])
                 file_return=curs.fetchall()
             except:
                 if json=='json':
-                    return jsonify({"Connection error":"could not connect dd database "+db+" or unknown url parameters"})
+                    return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters3ß"})
                 else:
                     flash ("Error: unable to fetch items")
-            id_results=list(row[1:2])+[iresults[index][0]]+[iresults[index][2]]+list(row[3:8])+list(row[12:])+[file_return[0][0]]
+            id_results=list(row[1:2])+[iresults[0][0]]+[iresults[0][2]]+list(row[3:8])+list(row[12:])+[file_return[0][0]]
             results.append(tuple(id_results))
         curs.close()
         columns, results= change_for_display([columns], results)
@@ -2033,7 +2033,7 @@ def get_sample_per_sample_id(s_id, db, json):
             session['query']=[url_for('get_sample_per_sample_id', s_id=s_id, db=db, json=json), 'lane']
             dicj=dict(remove_column(iresults, 1))
             for_display="sample name (sample_id) = "+str(dicj)[1:-1].replace(",", "),").replace(": ", " (")+")"
-            return render_template("mysql.html", title='Query was: lane(s) fwhere '+for_display, url_param=['file', 0, '/web'], results=[columns[0],results], plus=['',''], db=db, crumbs=crumbs)
+            return render_template("mysql.html", title='Query was: lane(s) where '+for_display, url_param=['file', 0, '/web'], results=[columns[0],results], plus=['',''], db=db, crumbs=crumbs)
     else:
         curs.close()
         if json == 'json':
@@ -2094,7 +2094,7 @@ def get_samples_by_name(sname, db, json):
         sresults=curs.fetchall()
     except:
         if json=='json':
-            return jsonify({"Connection error":"could not connecat to database "+db+" or unknown url parameters"})
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch samples")
     curs.close()

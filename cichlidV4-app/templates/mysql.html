@@ -96,18 +96,18 @@
         'sScrollX': '100%',
         buttons: [
           {extend: 'colvis', postfixButtons: ['colvisRestore'], text: 'add/remove columns'},
-          {extend: 'csvHtml5', text: 'Save current page (TSV)',
+          {extend: 'csvHtml5', text: 'Save all page(s) (TSV)',
             exportOptions: { modifier: {
               fieldSeparator: '\t',
               extension: '.tsv',
-              page: 'current'}}},
-          {extend: 'excel', text: 'Save current page (excel)',
+              selected: null}}},
+          {extend: 'excel', text: 'Save all page(s) (excel)',
               exportOptions: { modifier: {
               fieldSeparator: '\t',
-              page: 'current'}}},
-          {extend: 'pdf', text: 'Save current page (pdf)',
+              selected: null}}},
+          {extend: 'pdf', text: 'Save all page(s) (pdf)',
               exportOptions: { modifier: {
-              page: 'current'}}}
+              selected: null}}}
         ],
         "columnDefs": [ {
           "targets": 0,
