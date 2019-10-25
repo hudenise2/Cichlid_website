@@ -1998,7 +1998,7 @@ def get_sample_per_sample_id(s_id, db, json):
         sresults=curs.fetchall()
     except:
         if json=='json':
-            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters1"})
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch lanes")
     if len(sresults) > 0:
@@ -2017,7 +2017,7 @@ def get_sample_per_sample_id(s_id, db, json):
                 file_return=curs.fetchall()
             except:
                 if json=='json':
-                    return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters3ß"})
+                    return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
                 else:
                     flash ("Error: unable to fetch items")
             id_results=list(row[1:2])+[iresults[0][0]]+[iresults[0][2]]+list(row[3:8])+list(row[12:])+[file_return[0][0]]
