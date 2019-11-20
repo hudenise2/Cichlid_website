@@ -49,8 +49,45 @@
     	float: right;
       margin-right: 10px;
       }
-    </style>
 
+      /* Style the tab */
+     .tab {
+       overflow: hidden;
+       border: 1px solid #77A7E8;
+       background-color: #E4EDFA;
+     }
+
+     /* Style the buttons inside the tab */
+     .tab button {
+       background-color: inherit;
+       float: left;
+       border: none;
+       outline: none;
+       cursor: pointer;
+       padding: 14px 16px;
+       transition: 0.3s;
+       font-size: 17px;
+     }
+
+     /* Change background color of buttons on hover */
+     .tab button:hover {
+       background-color: #ddd;
+     }
+
+     /* Create an active/current tablink class */
+     .tab button.active {
+       background-color: #77A7E8;
+     }
+
+     /* Style the tab content */
+     .tabcontent {
+
+       padding: 6px 12px;
+       -webkit-animation: fadeEffect 1s;
+       animation: fadeEffect 1s;
+     }
+    </style>
+  </head>
 
   <div>
     <h5 style="text-indent: 50px;"> <b>{{title}}</b> </style>
@@ -61,23 +98,35 @@
       {% endif %}
       <b class="alignright">
         {% if log == 1 %}
-        <h3 style="text-align:right;font-size:100%;margin: 20px;"> logged in as
+        <h3 style="text-align:right;font-size:150%;margin: 20px;"> logged in as
           <a style="font-size:120%;">{{usrname}}</a>
         {% endif %}
         <p></p>
-      </b>
+        </b>
     </h5>
   </div>
-  </head>
+
   <body>
+
+    <div class="tab">
+      <button class="tablinks" onclick="showData(event, 'project')">Project</button>
+      <button class="tablinks" onclick="showData(event, 'individual')" id="defaultOpen">Individual</button>
+      <button class="tablinks" onclick="showData(event, 'material')">Material</button>
+      <button class="tablinks" onclick="showData(event, 'sample')">Sample</button>
+      <button class="tablinks" onclick="showData(event, 'file')">File</button>
+    </div>
+
+
+ <p></p>
+  <div id="project" class="tabcontent">
     <table class="TFtable" id="TFtable">
       <thead>
-        {% for key in results[0] %}
+        {% for key in presults[0] %}
           <th>{{key}}</th>
         {% endfor %}
       </thead>
       <tbody>
-        {% for row in results[1] %}
+        {% for row in presults[1] %}
           <tr>
             {% for data in row %}
               <td>{{data}}</td>
@@ -86,14 +135,93 @@
         {% endfor %}
       </tbody>
     </table>
-  </body>
+  </div>
+
+
+
+  <div id="individual" class="tabcontent">
+    <table class="TFtable" id="TFtable1">
+    <thead>
+      {% for key in iresults[0] %}
+        <th>{{key}}</th>
+      {% endfor %}
+    </thead>
+    <tbody>
+      {% for row in iresults[1] %}
+        <tr>
+          {% for data in row %}
+            <td>{{data}}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <div id="material" class="tabcontent">
+    <table class="TFtable" id="TFtable2">
+    <thead>
+      {% for key in mresults[0] %}
+        <th>{{key}}</th>
+      {% endfor %}
+    </thead>
+    <tbody>
+      {% for row in mresults[1] %}
+        <tr>
+          {% for data in row %}
+            <td>{{data}}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+    </table>
+  </div>
+
+  <div id="sample" class="tabcontent">
+    <table class="TFtable" id="TFtable3">
+    <thead>
+      {% for key in sresults[0] %}
+        <th>{{key}}</th>
+      {% endfor %}
+    </thead>
+    <tbody>
+      {% for row in sresults[1] %}
+        <tr>
+          {% for data in row %}
+            <td>{{data}}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+    </table>
+  </div>
+
+  <div id="file" class="tabcontent">
+    <table class="TFtable" id="TFtable4">
+    <thead>
+      {% for key in fresults[0] %}
+        <th>{{key}}</th>
+      {% endfor %}
+    </thead>
+    <tbody>
+      {% for row in fresults[1] %}
+        <tr>
+          {% for data in row %}
+            <td>{{data}}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+    </table>
+  </div>
+</body>
+
+
 
   <script>
-    var tt = '{{ title }}'.substring(11,);
     $(document).ready(function() {
-      $('#TFtable').DataTable( {
+      $('.TFtable').DataTable( {
         dom: 'Bfrtip',
-        'sScrollY': '400px',
         'sScrollX': '100%',
         buttons: [
           {extend: 'colvis', postfixButtons: ['colvisRestore'], text: 'add/remove columns'},
@@ -120,10 +248,30 @@
             }
             return data2;
           }
-        } ,
-      ]
-      } )
+        },
+        {
+                "targets": [ 2 ],
+                "visible": false,
+      }]
     } );
+     });
+    function showData(evt, DataName) {
+      var i, tabcontent, tablinks;
+      tabcontent = document.getElementsByClassName("tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+      tablinks = document.getElementsByClassName("tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+      document.getElementById(DataName).style.display = "block";
+      evt.currentTarget.className += " active";
+      if($('#' + DataName +  ' .sorting')[0]) {
+        $('#' + DataName +  ' .sorting')[0].click();
+      }
+    }
+    document.getElementById("defaultOpen").click();
   </script>
 
 {% endblock %}

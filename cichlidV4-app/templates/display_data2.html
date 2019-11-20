@@ -49,8 +49,20 @@
     	float: right;
       margin-right: 10px;
       }
+      .option-heading:before           { content: "\25BA";}
+      .option-heading.is-active:before { content: "\25BC"; }
+      /* Helpers */
+      .is-hidden { content: "\25BC"; display: none;
+      .btn {
+      display: inline-block;
+      margin: 0;
+      outline: 0 none;
+      padding: 0;
+      width: 0%;
+      box-sizing:border-box;
+  }};
     </style>
-
+  </head>
 
   <div>
     <h5 style="text-indent: 50px;"> <b>{{title}}</b> </style>
@@ -61,23 +73,27 @@
       {% endif %}
       <b class="alignright">
         {% if log == 1 %}
-        <h3 style="text-align:right;font-size:100%;margin: 20px;"> logged in as
+        <h3 style="text-align:right;font-size:150%;margin: 20px;"> logged in as
           <a style="font-size:120%;">{{usrname}}</a>
         {% endif %}
         <p></p>
-      </b>
+        </b>
     </h5>
   </div>
-  </head>
+
   <body>
+
+
+ <p></p>
+  <div id="project" class="showData">
     <table class="TFtable" id="TFtable">
       <thead>
-        {% for key in results[0] %}
+        {% for key in presults[0] %}
           <th>{{key}}</th>
         {% endfor %}
       </thead>
       <tbody>
-        {% for row in results[1] %}
+        {% for row in presults[1] %}
           <tr>
             {% for data in row %}
               <td>{{data}}</td>
@@ -86,14 +102,93 @@
         {% endfor %}
       </tbody>
     </table>
-  </body>
+  </div>
+
+
+
+  <div id="individual" class="showData">
+    <table class="TFtable" id="TFtable1">
+    <thead>
+      {% for key in iresults[0] %}
+        <th>{{key}}</th>
+      {% endfor %}
+    </thead>
+    <tbody>
+      {% for row in iresults[1] %}
+        <tr>
+          {% for data in row %}
+            <td>{{data}}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <div id="material" class="showData">
+    <table class="TFtable" id="TFtable2">
+    <thead>
+      {% for key in mresults[0] %}
+        <th>{{key}}</th>
+      {% endfor %}
+    </thead>
+    <tbody>
+      {% for row in mresults[1] %}
+        <tr>
+          {% for data in row %}
+            <td>{{data}}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+    </table>
+  </div>
+
+  <div id="sample" class="showData">
+    <table class="TFtable" id="TFtable3">
+    <thead>
+      {% for key in sresults[0] %}
+        <th>{{key}}</th>
+      {% endfor %}
+    </thead>
+    <tbody>
+      {% for row in sresults[1] %}
+        <tr>
+          {% for data in row %}
+            <td>{{data}}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+    </table>
+  </div>
+
+  <div id="file" class="showData">
+    <table class="TFtable" id="TFtable4">
+    <thead>
+      {% for key in fresults[0] %}
+        <th>{{key}}</th>
+      {% endfor %}
+    </thead>
+    <tbody>
+      {% for row in fresults[1] %}
+        <tr>
+          {% for data in row %}
+            <td>{{data}}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+    </table>
+  </div>
+</body>
+
+
 
   <script>
-    var tt = '{{ title }}'.substring(11,);
     $(document).ready(function() {
-      $('#TFtable').DataTable( {
+      $('.TFtable').DataTable( {
         dom: 'Bfrtip',
-        'sScrollY': '400px',
         'sScrollX': '100%',
         buttons: [
           {extend: 'colvis', postfixButtons: ['colvisRestore'], text: 'add/remove columns'},
@@ -120,10 +215,18 @@
             }
             return data2;
           }
-        } ,
-      ]
-      } )
+        },
+        {
+                "targets": [ 2 ],
+                "visible": false,
+      }]
     } );
+     });
+    $(function) () {
+      $(".option-heading").on('click', function() {
+        $(this).toggleClass('is-active').next(".option-content").stop().slideToggle(500);
+      });
+    }
   </script>
 
 {% endblock %}

@@ -55,6 +55,12 @@
 <div>
 <h5 style="text-indent: 50px;"> <b>{{title}}</b> </style>
 <b class="alignright">
+    {% if log == 1 %}
+    <h3 style="text-align:right;font-size:150%;margin: 20px;"> logged in as
+      <a style="font-size:120%;">{{usrname}}</a>
+    {% endif %}
+    <p></p>
+
 {% for breadcrumb in crumbs %}
     <a href="{{ breadcrumb[0] }}">{{ breadcrumb[1] }}</a>
     {{ '>' if not loop.last }}

@@ -35,8 +35,8 @@
 <head>
   <title>Welcome to the Durbin's group database</title>
       <div  margin-left: 100px>
-      <h3 style="text-align:right;font-size:150%;margin: 20px;"> Selected database:
-        <a style="font-size:120%;">{{db}}</a>
+        <h3 style="text-align:right;font-size:150%;margin: 20px;"> logged in as
+          <a style="font-size:120%;">{{usrname}}</a>
       </h3>
     </div>
   </head>
@@ -44,7 +44,7 @@
 
     <form action="{{ url_for('enter_data', db=db) }}" method="post">
       {{ form.hidden_tag() }}
-      <h3> If you want to add or update data to the cichlid database, <p style="margin-left: 40px">      you can download a template
+      <h3 style="text-align:center;font-weight:500;line-height:1.2; font-family:-apple-system; margin-top:0;font-size:2.5rem;color:#007bff;">or ENTER DATA data into the {{db}} database:<p style="margin-left: 40px"></h3><h3>     you can download a template
             <label for="sel_temp" class="btn" style='font-size: 20px; font-style:italic; color: darkblue'>-here-</label>
             <input type="submit" id="sel_temp" style='display:none;' name="Download">, fill it,
             <label for="upfiles" class="btn" style='font-size: 20px; font-style:italic; color: darkblue'  >-re-upload-</label>

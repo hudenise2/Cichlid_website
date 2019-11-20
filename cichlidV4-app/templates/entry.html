@@ -53,26 +53,29 @@ div.a {
   <title>Welcome to the Durbin's group database</title>
   <link rel="stylesheet" type="text/css" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" media="screen">
 
-    <div  margin-left: 100px>
-      <h3 style="text-align:right;font-size:150%;margin: 20px;"> Selected database:
-        <a style="font-size:120%;">{{db}}</a>
-      </h3>
-    </div>
-  </head>
+  <div>
+    <b class="alignright">
+    {% if log == 1 %}
+    <h3 style="text-align:right;font-size:150%;margin: 20px;"> logged in as
+      <a style="font-size:120%;">{{usrname}}</a>
+    {% endif %}
+  </b>
+</div>
+</head>
 <body>
   <div class="a">
 <div class="dropdown" name='dropdown'>
   <button onclick="myFunction()" class="dropbtn">Select a table</button>
   <div id="myDropdown" class="dropdown-content">
-    <a href="{{ url_for('get_images', db=db, json=json) }}">Images</a>
-    <a href="{{ url_for('get_individuals', db=db, json=json) }}">Individual</a>
-    <a href="{{ url_for('get_lanes', db=db, json=json) }}">Lane</a>
-    <a href="{{ url_for('get_location', db=db, json=json) }}">Location</a>
-    <a href="{{ url_for('get_material', db=db, json=json) }}">Material</a>
-    <a href="{{ url_for('get_projects', db=db, json=json) }}">Project</a>
-    <a href="{{ url_for('get_provider', db=db, json=json) }}">Provider</a>
-    <a href="{{ url_for('get_samples', db=db, json=json) }}">Sample</a>
-    <a href="{{ url_for('get_species', db=db, json=json) }}">Species</a>
+    <a href="{{ url_for('get_images', db=db, ext_flag=ext_flag) }}">Images</a>
+    <a href="{{ url_for('get_individuals', db=db, ext_flag=ext_flag) }}">Individual</a>
+    <a href="{{ url_for('get_lanes', db=db, ext_flag=ext_flag) }}">Lane</a>
+    <a href="{{ url_for('get_location', db=db, ext_flag=ext_flag) }}">Location</a>
+    <a href="{{ url_for('get_material', db=db, ext_flag=ext_flag) }}">Material</a>
+    <a href="{{ url_for('get_projects', db=db, ext_flag=ext_flag) }}">Project</a>
+    <a href="{{ url_for('get_provider', db=db, ext_flag=ext_flag) }}">Provider</a>
+    <a href="{{ url_for('get_samples', db=db, ext_flag=ext_flag) }}">Sample</a>
+    <a href="{{ url_for('get_species', db=db, ext_flag=ext_flag) }}">Species</a>
   </div>
 </div>
 
