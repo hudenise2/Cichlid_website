@@ -20,7 +20,7 @@ app = Flask(__name__)
 '''
 #initialisation of connection
 config_file_path=os.path.dirname(os.path.abspath(__file__))+'/Darwin_dbV1.json'
-# for web version: '/www/hd2/www-dev/other-sites/darwin-tracking.sanger.ac.uk/cichlidV4-app/Darwin_dbV1.json'
+# for web version: '/www/hd2/www-dev/other-sites/cichlid-tracking.sanger.ac.uk/cichlidV4-app/Darwin_dbV1.json'
 configSettings = json.load(open(config_file_path, 'r'))
 app.config.from_object(Config)
 app.config['MYSQL_HOST'] = configSettings["MySQL_host"]
@@ -947,7 +947,7 @@ def get_image_per_image_id(im_id, db, ext_flag):
     columns=tuple(col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM image where latest=1 and image_id = '%s';" % im_id)
+        curs.execute("SELECT individual_id, filename FROM image where latest=1 and image_id = '%s';" % im_id)
         img_results=curs.fetchall()
     except:
         if ext_flag=='json':
@@ -955,21 +955,14 @@ def get_image_per_image_id(im_id, db, ext_flag):
         else:
             flash ("Error: unable to fetch images")
     curs.close()
-    if len(img_results) ==0:
+    if len(img_results)==0:
         if ext_flag=='json':
-            return jsonify({"Data error":"no image associated with criteria provided"})
+            return jsonify({"Data error":"no individual associated with criteria provided"})
         else:
-            flash ("Error: no image associated with criteria provided")
+            flash ("Error: no individual associated with criteria provided")
     else:
-        for row in img_results:
-            i_results=[row[0]]+[row[2]]+[row[1]]+list([row[3]+"/"+row[2]])+list(row[3:])
-            results.append(i_results)
-        new_column, display_results= change_for_display([columns], results, ext_flag)
-        if ext_flag=='json':
-            return jsonify(webresults_to_dic(web_results))
-        else:
-            #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] indicate no display), crumbs (to display navigation history))
-            return render_template("image.html", title="Query was: file name (image_id) = '"+img_results[0][2] +"' ("+str(im_id) +")" , url_param=['individual/name', 2, '/web'], results=[new_column[0],display_results], plus=['', ''], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+        session['criteria']="image name (image_id)= "+str(img_results[0][-1]) +" ("+str(im_id)+")"
+        return redirect(url_for('get_individual_per_individual_id', i_id="("+str(img_results[0][0])+")", db=db, ext_flag=ext_flag))
 
 @app.route('/<db>/api/1.1/image/<ext_flag>', methods=['GET'])
 def get_images(db, ext_flag):
@@ -1000,7 +993,6 @@ def get_images(db, ext_flag):
     if ext_flag=='json':
         return get_images_all(db=db, ext_flag=ext_flag)
     else:
-
         #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed)crumbs (to display navigation history))
         return render_template("image.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
