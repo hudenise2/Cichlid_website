@@ -133,7 +133,7 @@
             {% for row in results[tab_data]['data'] %}
             <tr>
               {% for item in row %}
-                {% if (item is string and item[:5] == 'http:') %}
+                {% if (item is string and item[:4] == 'http') %}
                   <td><a target="_blank" href={{item}}>
                   <img src={{item}} style="width:150px"></a></td>
                 {% else %}
@@ -190,7 +190,7 @@
                   if (data.substr(0, 2) == 'no') {
                     data2 = data;
                   } else {
-                   data2 = '<a href="/{{db}}/api/1.1/'+row[0]+ '/'+data+'/web">'+data+'</a>';
+                   data2 = '<a href="/api/1.1/'+row[0]+ '/'+data+'/web">'+data+'</a>';
                  }
                 return data2;
               }},
