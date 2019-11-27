@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% include "base.html" %}
 
 {% block content %}
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -67,15 +67,15 @@ div.a {
 <div class="dropdown" name='dropdown'>
   <button onclick="myFunction()" class="dropbtn">Select a table</button>
   <div id="myDropdown" class="dropdown-content">
-    <a href="{{ url_for('get_images', db=db, ext_flag=ext_flag) }}">Images</a>
-    <a href="{{ url_for('get_individuals', db=db, ext_flag=ext_flag) }}">Individual</a>
-    <a href="{{ url_for('get_lanes', db=db, ext_flag=ext_flag) }}">Lane</a>
-    <a href="{{ url_for('get_location', db=db, ext_flag=ext_flag) }}">Location</a>
-    <a href="{{ url_for('get_material', db=db, ext_flag=ext_flag) }}">Material</a>
-    <a href="{{ url_for('get_projects', db=db, ext_flag=ext_flag) }}">Project</a>
-    <a href="{{ url_for('get_provider', db=db, ext_flag=ext_flag) }}">Provider</a>
-    <a href="{{ url_for('get_samples', db=db, ext_flag=ext_flag) }}">Sample</a>
-    <a href="{{ url_for('get_species', db=db, ext_flag=ext_flag) }}">Species</a>
+    <a href="{{ url_for('get_images', ext_flag=ext_flag) }}">Images</a>
+    <a href="{{ url_for('get_individuals', ext_flag=ext_flag) }}">Individual</a>
+    <a href="{{ url_for('get_lanes', ext_flag=ext_flag) }}">Lane</a>
+    <a href="{{ url_for('get_location', ext_flag=ext_flag) }}">Location</a>
+    <a href="{{ url_for('get_material', ext_flag=ext_flag) }}">Material</a>
+    <a href="{{ url_for('get_projects', ext_flag=ext_flag) }}">Project</a>
+    <a href="{{ url_for('get_provider', ext_flag=ext_flag) }}">Provider</a>
+    <a href="{{ url_for('get_samples', ext_flag=ext_flag) }}">Sample</a>
+    <a href="{{ url_for('get_species', ext_flag=ext_flag) }}">Species</a>
   </div>
 </div>
 
@@ -151,3 +151,4 @@ div.a {
 
     </form>
 {% endblock %}
+{% extends "foot.html" %}

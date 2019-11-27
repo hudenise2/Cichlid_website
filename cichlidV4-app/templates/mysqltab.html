@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% include "base.html" %}
 
 {% block content %}
   <head>
@@ -135,7 +135,7 @@
               {% for item in row %}
                 {% if (item is string and item[:4] == 'http') %}
                   <td><a target="_blank" href={{item}}>
-                  <img src={{item}} style="width:150px"></a></td>
+                  <img src={{ '/'.join(item.split('/')[:-1])+'/thumbnails/'+item.split('/')[-1] }}></a></td>
                 {% else %}
                   <td>{{item}}</td>
                 {% endif %}
@@ -204,3 +204,4 @@
   document.getElementById("defaultOpen").click();
   </script>
 {% endblock %}
+{% extends "foot.html" %}

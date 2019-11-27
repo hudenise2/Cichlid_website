@@ -106,7 +106,7 @@
         <b style="font-size: 25px;margin-left:10px"><a href="{{ plus[0]}}">{{ "[-]" }}</a></style></b>
       {% endif %}
       <p></p>
-      
+
     </h5>
   </div>
 
@@ -120,21 +120,14 @@
        </thead>
         {% for row in results[1] %}
           <tr>
-            {% for i in (0,1,2) %}
-              <td>{{row[i]}}</td>
+            {% for item in row %}
+              {% if (item is string and item[:4] == 'http') %}
+                <td><a target="_blank" href={{item}}>
+                <img src={{item}} style="width:150px"></a></td>
+              {% else %}
+                <td>{{item}}</td>
+              {% endif %}
             {% endfor %}
-            <td>
-              <a target="_blank" href={{row[3]}}>
-              <img src={{row[3]}} style="width:150px">
-            {% if plus[1] == 'yes' %}
-              {% for i in range(4,5) %}
-                <td>{{row[i]}}</td>
-              {% endfor %}
-            {% else %}
-              {% for i in range(4, 10) %}
-                <td>{{row[i]}}</td>
-              {% endfor %}
-            {% endif %}
           </tr>
         {% endfor %}
      </table>

@@ -1,4 +1,4 @@
-{% extends "baseLog.html" %}
+{% include "baseLog.html" %}
 
 {% block content %}
 
@@ -42,9 +42,9 @@
   </head>
 <body>
 
-    <form action="{{ url_for('enter_data', db=db) }}" method="post">
+    <form action="{{ url_for('enter_data') }}" method="post">
       {{ form.hidden_tag() }}
-      <h3 style="text-align:center;font-weight:500;line-height:1.2; font-family:-apple-system; margin-top:0;font-size:2.5rem;color:#007bff;">or ENTER DATA data into the {{db}} database:<p style="margin-left: 40px"></h3><h3>     you can download a template
+      <h3 style="text-align:center;font-weight:500;line-height:1.2; font-family:-apple-system; margin-top:0;font-size:2.5rem;color:#007bff;">ENTER DATA data into the {{db}} database:<p style="margin-left: 40px"></h3><h3>     you can download a template
             <label for="sel_temp" class="btn" style='font-size: 20px; font-style:italic; color: darkblue'>-here-</label>
             <input type="submit" id="sel_temp" style='display:none;' name="Download">, fill it,
             <label for="upfiles" class="btn" style='font-size: 20px; font-style:italic; color: darkblue'  >-re-upload-</label>
@@ -235,3 +235,4 @@
 
 
 {% endblock %}
+{% extends "foot.html" %}

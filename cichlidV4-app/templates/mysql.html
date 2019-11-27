@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% include "base.html" %}
 
 {% block content %}
   <head>
@@ -79,8 +79,13 @@
       <tbody>
         {% for row in results[1] %}
           <tr>
-            {% for data in row %}
-              <td>{{data}}</td>
+            {% for item in row %}
+              {% if (item is string and item[:4] == 'http' and (item[-3:] == 'jpg' or item[-3:] == 'JPG')) %}
+               <td><a target="_blank" href={{item}}>
+                <img src={{'/'.join(item.split('/')[:-1])+'/thumbnails/'+item.split('/')[-1]}}></a></td>
+              {% else %}
+                <td>{{item}}</td>
+              {% endif %}
             {% endfor %}
           </tr>
         {% endfor %}
@@ -127,3 +132,4 @@
   </script>
 
 {% endblock %}
+{% extends "foot.html" %}
