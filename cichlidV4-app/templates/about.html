@@ -44,41 +44,42 @@
     </div>
   </head>
 <body>
-  <p style="margin: 20px;">This website provides access to sample and sequencing information for the East-African cichlid project carried out in <a href="https://www.gen.cam.ac.uk/directory/richard-durbin">Richard Durbin</a>'s group.
-  <br>The research involves stydying the genetic variation, evolutionary and population genetics in cichlid fishes.</p>
+  <p style="margin: 20px;">This website provides access to sample and sequencing information for the {{proj[0][0]}} project carried out in <a href="https://www.gen.cam.ac.uk/directory/richard-durbin">Richard Durbin</a>'s group.
+  <br>{{proj[0][1]}}</p>
         <p></p>
     <fieldset>
-      <div class="option-heading"><b>Contact</b> information </div>
+      <div class="option-heading" style="color:#007bff;"><b>Contact</b> information </div>
       <div class="option-content is-hidden">
-        <p>To comment, add suggestions or report issues, please send an email by clicking <a style="text-align:center;color:#007bff;text-decoration:none;"href="mailto:had38@cam.ac.uk?Subject=Cichlid%20website%20email">here</a></p>
+        <p>To comment, add suggestions or report issues, please send an email by clicking <a style="text-align:center;color:#007bff;text-decoration:none;"href="mailto:had38@cam.ac.uk?Subject="+db+"%20website%20email">here</a></p>
       </div>
     </fieldset>
     <p></p>
     <fieldset>
-      <div class="option-heading"><b>Funding</b> information </div>
+      <div class="option-heading" style="color:#007bff;"><b>Funding</b> information </div>
       <div class="option-content is-hidden">
-      <p>Richard Durbin</p>
+      <p>{{proj[1]}}</p>
     </div>
     </fieldset>
         <p></p>
     <fieldset>
-      <div class="option-heading"><b>Collaboration</b> ongoing </div>
+      <div class="option-heading" style="color:#007bff;"><b>Collaboration</b> ongoing </div>
       <div class="option-content is-hidden">
-      <p>name of people involves</p>
+      <p>{{proj[2]}}</p>
     </fieldset>
     <p></p>
     <fieldset>
-      <div class="option-heading"><b>Publication</b> (latest) </div>
+      <div class="option-heading" style="color:#007bff;"><b>Publication</b> (latest) </div>
       <div class="option-content is-hidden">
-        <p><a style="text-align:center;color:#007bff;text-decoration:none;" target="_blank" href="https://www.ncbi.nlm.nih.gov/pubmed/30455444">Whole-genome sequences of Malawi cichlids reveal multiple radiations interconnected by gene flow.</a>
-        <br>Malinsky M, Svardal H, Tyers AM, Miska EA, Genner MJ, Turner GF, Durbin R
-        <br>Nat Ecol Evol. 2018 Dec;2(12):1940-1955
-        <br>doi: 10.1038/s41559-018-0717-x.</p>
+        <p><a style="text-align:center;color:#007bff;text-decoration:none;" target="_blank" href={{proj[3][0][0]}}>{{proj[3][0][1]}}</a>
+        {% for entry in proj[3][1] %}
+          <br>{{entry}}
+        {% endfor %}
+        </p>
       </div>
     </fieldset>
     <p></p>
     <fieldset>
-      <div class="option-heading"><b>Resource</b> creator </div>
+      <div class="option-heading" style="color:#007bff;"><b>Resource</b> creator </div>
       <div class="option-content is-hidden">
         <br><a style="text-align:center;color:#007bff;text-decoration:none;"href="mailto:had38@cam.ac.uk?Subject=Cichlid%20website%20contact">Hubert DENISE (2019)</a>
         <br>Department of Genetics, University of Cambridge

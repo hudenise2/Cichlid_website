@@ -807,12 +807,32 @@ def upload(file):
 @app.route('/api/1.1/info', methods=['GET', 'POST'])
 def info():
     """function to display the about page"""
-    return render_template("about.html", db=db, log=session['logged_in'], usrname=session.get('usrname', None))
+    proj=[]
+    if db=='cichlid':
+        proj.append(['East-African cichlid','The research involves studying the genetic variation, evolutionary and population genetics in cichlid fishes.'])
+        proj.append('Richard Durbin')
+        proj.append('names of people involve (TBC)')
+        proj.append([['https://www.ncbi.nlm.nih.gov/pubmed/30455444', 'Whole-genome sequences of Malawi cichlids reveal multiple radiations interconnected by gene flow.'],['Malinsky M, Svardal H, Tyers AM, Miska EA, Genner MJ, Turner GF, Durbin R', 'Nat Ecol Evol. 2018 Dec;2(12):1940-1955','doi: 10.1038/s41559-018-0717-x.']])
+    elif db=='darwin':
+        proj.append(['Darwin Tree of Life','This project aims at sequencing all species of animal and plant in the United Kingdom.'])
+        proj.append('Richard Durbin')
+        proj.append('names of people involve (TBC)')
+        proj.append([['https://www.sanger.ac.uk/news/view/genetic-code-60000-uk-species-be-sequenced', 'Genetic code of 60,000 UK species to be sequenced'], ['Wellcome Sanger Institute']])
+    return render_template("about.html", db=db, log=session['logged_in'], proj=proj, usrname=session.get('usrname', None))
 
 @app.route('/api/1.1/faq', methods=['GET', 'POST'])
 def faq():
     """function to display the faq page"""
-    return render_template("faq.html", db=db, log=session['logged_in'], usrname=session.get('usrname', None))
+    proj=[]
+    if db=='cichlid':
+        proj.append('East-African cichlid')
+        proj.append('D01-A03')
+        proj.append('Liwonde')
+    elif db=='darwin':
+        proj.append('Darwin')
+        proj.append('fMasArm1')
+        proj.append('Sumatra')
+    return render_template("faq.html", db=db, log=session['logged_in'], proj=proj, usrname=session.get('usrname', None))
 
 ################### API RELATED FUNCTIONS ######################################
 @app.route('/api/1.1/file/<f_id>/<ext_flag>', methods=['GET'])
@@ -1063,7 +1083,7 @@ def get_individual_per_individual_id(i_id, ext_flag):
     individual_results={}
     curs = mysql.connection.cursor()
     i_id=i_id.replace("None,",'')
-    old_i_id=i_id.replace(" ","")
+    space_i_id=i_id.replace(",",", ")
     if "(" in i_id:
         i_id=i_id[1:-1]
     else:
@@ -1132,8 +1152,8 @@ def get_individual_per_individual_id(i_id, ext_flag):
         if len(session['criteria']) > 0:
             for_display=session['criteria']
         else:
-            for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+i_id+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/'+old_i_id+'/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
+            for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+space_i_id+")"
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/'+i_id+'/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
 @app.route('/api/1.1/individual/<i_id>/all/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_id_all(i_id, ext_flag):
@@ -1146,7 +1166,7 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
     fcolumns=get_columns_from_table('file')
     individual_results={}
     curs = mysql.connection.cursor()
-    old_i_id=i_id
+    space_i_id=i_id.replace(",",", ")
     if "(" in i_id:
         i_id=i_id[1:-1]
     else:
@@ -1214,8 +1234,8 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
         if len(session['criteria']) > 0:
             for_display=session['criteria']
         else:
-            for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+old_i_id+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/'+old_i_id+'/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
+            for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+space_i_id+")"
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/'+i_id+'/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
 @app.route('/api/1.1/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_name(ind_name, ext_flag):
@@ -1421,9 +1441,9 @@ def get_individual_per_location_id(loc_id, ext_flag):
         else:
             flash ("Error: no location associated with criteria provided")
     else:
-        list_individual_id=", ".join([str(x[0]) for x in res])
+        list_individual_id=",".join([str(x[0]) for x in res])
         session['criteria']="location name (location_id)= "+res[0][-1] +" ("+str(loc_id)+")"
-        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")",  ext_flag=ext_flag))
+        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id.replace(",",", ")+")",  ext_flag=ext_flag))
 
 @app.route('/api/1.1/location/<loc_id>/individual/<ind_id>/<ext_flag>', methods=['GET'])
 def get_individual_per_id_and_per_location_id(loc_id, ind_id, ext_flag):
@@ -2111,7 +2131,7 @@ def get_individual_by_provider(p_id, ext_flag):
             flash ("Error: no individual associated with criteria provided")
             return redirect(url_for('index'))
     else:
-        list_individual_id=", ".join([str(x[1]) for x in results])
+        list_individual_id=",".join([str(x[1]) for x in results])
         session['criteria']="provider name (provider_id)= "+results[0][-1]+" ("+str(p_id)+")"
         return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")",  ext_flag=ext_flag))
 
@@ -2450,9 +2470,9 @@ def get_species_per_species_id(sp_id, ext_flag):
             flash ("Error: no species associated with criteria provided")
             return redirect(url_for('index'))
     else:
-        list_individual_id=", ".join([str(x[0]) for x in sresults])
+        list_individual_id=",".join([str(x[0]) for x in sresults])
         session['criteria']="species name (species_id)= "+sresults[0][-1]+" ("+str(sp_id)+")"
-        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
+        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id.replace(",",", ")+")", ext_flag=ext_flag))
 
 @app.route('/api/1.1/species/<ext_flag>', methods=['GET'])
 def get_species(ext_flag):
