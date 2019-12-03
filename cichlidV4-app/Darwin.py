@@ -1167,16 +1167,12 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
     fcolumns=get_columns_from_table('file')
     individual_results={}
     curs = mysql.connection.cursor()
-    print("....................................................")
-    print(i_id)
     if "(" in i_id or '%28' in i_id:
         i_id=i_id[1:-1]
         space_i_id=i_id.replace(",", ", ")
     else:
         session['criteria']=""
         space_i_id=i_id.replace(",", ", ")
-    print("=====================================================")
-    print(i_id)
     list_i_id=i_id.split(',')
     list_i_name=[]
     for individual_id in list_i_id:
@@ -1241,7 +1237,6 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
             for_display=session['criteria']
         else:
             for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+space_i_id+")"
-        print(i_id)
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/('+i_id+')/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
 @app.route('/api/1.1/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
