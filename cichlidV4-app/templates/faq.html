@@ -12,7 +12,7 @@
 });
         });
     </script>
-
+    <script type="text/javascript" src="/zxtm/piwik2.js"></script>
     <style>
     .option-heading:before           { content: "\25BA"; }
     .option-heading.is-active:before { content: "\25BC"; }
@@ -50,10 +50,10 @@
     <fieldset>
       <div class="option-heading" style="color:#007bff;"><b>Which data can be accessed via this website?</b></div>
       <div class="option-content is-hidden">
-        <p>Data corresponding to most table in our database data can be accessed using the '<b>Select a table</b>' button.<br>
+        <p>This site provides access to metadata describing the collection, storage, processing and sequencing of samples.<p>Data corresponding to most tables in our database can be accessed using the '<b>Select a table</b>' button.<br>
           Specific 'project', 'individual', 'material', 'sample' and 'file' data are available following the links in the displayed tables or using the <b>query form</b> available on the home page.<br>
           Extra information will be displayed upon clicking on the '<span style="color:#007bff; font-size: 20px"><b>+</b></span>' sign displayd above the tables.<br>
-          Visibility of one or more columns can be toggled on, or off, using the '<b>add/remove columns</b>' button displayed above every table.
+          Visibility of one or more columns can be toggled on, or off, using the '<b>add/remove columns</b>' button displayed above every table.</p>
         </p>
       </div>
     </fieldset>
@@ -72,11 +72,11 @@
             <span style="margin-left: 50px;">sample:[<br><span style="margin-left: 75px;">{<i>sample_field1</i>: sample1_data1, <i>sample_field2</i>: sample1_data2, .....}</span>,<br><span style="margin-left: 75px;">{<i>sample_field1</i>: sample2_data1, <i>sample_field2</i>: sample2_data2, .....},...<br><span style="margin-left: 50px;">]</span><br>
             <span style="margin-left: 50px;">file:[<br><span style="margin-left: 75px;">{<i>file_field1</i>: file1_data1, <i>file_field2</i>: file1_data2, .....}</span>,<br><span style="margin-left: 75px;">{<i>file_field1</i>: file2_data1, <i>file_field2</i>: file2_data2, .....},...<br><span style="margin-left: 50px;">]</span><br><b><span style="margin-left: 25px;">)</span></b>
             <br>Similarly, the call for the third example will be: "<i>curl https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>individual</b>/<span style="color:#007bff;"><b>name</b></span>/<b>{{proj[1]}}</b>/json</i>".<p>
-            - Several 'individual' and 'sample' names can be inserted: they need to be separated by a comma, or "%2C", with no space.<br>
-            - For 'species' and 'location': add the flag '-L' to instruct curl to follow the links. Example: "<i>curl -L https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>location</b>/<span style="color:#007bff;"><b>name</b></span>/<b>{{proj[2]}}</b>/json</i>". Spaces in the names have to be replaced by "%20".<br>
+            - Several 'individual' and 'sample' names can be inserted: they need to be separated by a comma, or "%2C", with no space. No parenthesis or replace them with '%28' and '%29', respectively.<br>
+            - For 'species', 'provider', 'lane' and 'location': add the flag '-L' to instruct curl to follow the links (this flag can be added to all queries without adverse consequences). Example: "<i>curl -L https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>location</b>/<span style="color:#007bff;"><b>name</b></span>/<b>{{proj[2]}}</b>/json</i>". Spaces in the names have to be replaced by "%20".<br>
             - Species queries accept partial name. For example: "<i>curl -L https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>species</b>/<span style="color:#007bff;"><b>name</b></span>/<b>Rhampho</b>/json</i>" will return the equivalent that "<i>curl -L https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>species</b>/<span style="color:#007bff;"><b>name</b></span>/<b>Rhamphochromis</b>/json</i>" would.<br>
             - Note that the tag 'all' can be added to obtain more information, equivalent to the '<span style="color:#007bff;font-size: 20px"><b>+</b></span>' sign on the web pages, for tables 'individual', 'lane', 'material', 'species' and 'provider'. Example: "<i>curl -L https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>species</b>/<span style="color:#007bff;"><b>all</b></span>/json</i>".<br>
-            - The tag 'all' can also be used in conjonction with '.../<b>individual</b>/<b>{id}</b>/json', '.../<b>material</b>/<b>{id}</b>/json' and '.../<b>sample</b>/<b>{id}</b>/json.'
+            - The tag 'all' can also be used in conjonction with '.../<b>project</b>/<b>{id}</b>/json', '.../<b>individual</b>/<b>{id}</b>/json', '.../<b>material</b>/<b>{id}</b>/json', '.../<b>file</b>/<b>{id}</b>/json' and '.../<b>sample</b>/<b>{id}</b>/json.'
           </p>
       </div>
     </fieldset>

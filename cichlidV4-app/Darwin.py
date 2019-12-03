@@ -1,4 +1,5 @@
 #!/Library/Frameworks/Python.framework/Versions/3.7/bin/python3
+
 from flask import Flask, render_template, request,  flash, redirect, url_for, session, send_file, jsonify
 from flask_mysqldb import MySQL
 from flask_migrate import Migrate
@@ -15,11 +16,10 @@ app = Flask(__name__)
 
 '''
     Website script written by H. Denise (Cambridge Uni) 27/11/2019
-    Script for the Darwin database
+    Script for the Cichlid database
 '''
 #initialisation of connection
 config_file_path=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/config/Darwin_dbV1.json'
-# for web version: '/www/hd2/www-dev/other-sites/cichlid-tracking.sanger.ac.uk/cichlidV4-app/Cichlid_dbV4.json'
 configSettings = json.load(open(config_file_path, 'r'))
 app.config.from_object(Config)
 app.config['MYSQL_HOST'] = configSettings["MySQL_host"]
@@ -516,7 +516,7 @@ def webresults_to_dic(results):
             #2nd subdictionary has field as key and corresponding data as value
             for entry in res:
                 new_dic={}
-                for index in range(2, len(entry)):
+                for index in range(1, len(entry)):
                     new_dic[col[index]]=entry[index]
                 new_list.append(new_dic)
             data_dic[table]=new_list
@@ -548,7 +548,7 @@ def verify_password(stored_password, provided_password):
     return pwdhash == stored_password
 
 ################### WEB APP FUNCTIONS ##########################################
-#@app.route('')
+#@app.route('/')
 #@app.route('/index')
 @app.route('/index', methods=['GET', 'POST'])
 def index():
@@ -807,12 +807,32 @@ def upload(file):
 @app.route('/api/1.1/info', methods=['GET', 'POST'])
 def info():
     """function to display the about page"""
-    return render_template("about.html", db=db, log=session['logged_in'], usrname=session.get('usrname', None))
+    proj=[]
+    if db=='cichlid':
+        proj.append(['East-African cichlid','The research involves studying evolutionary and population genetics in cichlid fishes via whole genome sequences and associated phenotypic variation.'])
+        proj.append('This website and much of the data in it are funded by Wellcome grant WT207492.')
+        proj.append('We thank our collaborators George Turner (Bangor University), Martin Genner (University of Bristol), Hannes Svardal (University of Antwerp), Eric Miska (Gurdon Institute, Cambridge), Emilia Santos (Dept. of Zoology, Cambridge) and members of their teams, and Milan Malinsky (University of Basel) for contributing samples and data.')
+        proj.append([['https://www.ncbi.nlm.nih.gov/pubmed/30455444', 'Whole-genome sequences of Malawi cichlids reveal multiple radiations interconnected by gene flow.'],['Malinsky M, Svardal H, Tyers AM, Miska EA, Genner MJ, Turner GF, Durbin R', 'Nat Ecol Evol. 2018 Dec;2(12):1940-1955','doi: 10.1038/s41559-018-0717-x.']])
+    elif db=='darwin':
+        proj.append(['Darwin Tree of Life','This project aims at sequencing all species of animal and plant in the United Kingdom.'])
+        proj.append('Richard Durbin')
+        proj.append('names of people involve (TBC)')
+        proj.append([['https://www.sanger.ac.uk/news/view/genetic-code-60000-uk-species-be-sequenced', 'Genetic code of 60,000 UK species to be sequenced'], ['Wellcome Sanger Institute']])
+    return render_template("about.html", db=db, log=session['logged_in'], proj=proj, usrname=session.get('usrname', None))
 
 @app.route('/api/1.1/faq', methods=['GET', 'POST'])
 def faq():
     """function to display the faq page"""
-    return render_template("faq.html", db=db, log=session['logged_in'], usrname=session.get('usrname', None))
+    proj=[]
+    if db=='cichlid':
+        proj.append('East-African cichlid')
+        proj.append('D01-A03')
+        proj.append('Liwonde')
+    elif db=='darwin':
+        proj.append('Darwin')
+        proj.append('fMasArm1')
+        proj.append('Sumatra')
+    return render_template("faq.html", db=db, log=session['logged_in'], proj=proj, usrname=session.get('usrname', None))
 
 ################### API RELATED FUNCTIONS ######################################
 @app.route('/api/1.1/file/<f_id>/<ext_flag>', methods=['GET'])
@@ -1062,12 +1082,13 @@ def get_individual_per_individual_id(i_id, ext_flag):
     fcolumns=['row_id', 'file_id', 'lane_id', 'name', 'format', 'type', 'md5', 'nber_reads', 'total_length', 'average_length']
     individual_results={}
     curs = mysql.connection.cursor()
-    i_id=i_id.replace("None,",'')
-    old_i_id=i_id.replace(" ","")
-    if "(" in i_id:
+    i_id=i_id.replace('None,','')
+    if "(" in i_id or '%28' in i_id:
         i_id=i_id[1:-1]
+        space_i_id=i_id.replace(",",", ")
     else:
         session['criteria']=""
+        space_i_id=i_id.replace(",",", ")
     list_i_id=i_id.split(',')
     list_i_name=[]
     for individual_id in list_i_id:
@@ -1132,8 +1153,8 @@ def get_individual_per_individual_id(i_id, ext_flag):
         if len(session['criteria']) > 0:
             for_display=session['criteria']
         else:
-            for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+i_id+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/'+old_i_id+'/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
+            for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+space_i_id+")"
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/('+i_id+')/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
 @app.route('/api/1.1/individual/<i_id>/all/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_id_all(i_id, ext_flag):
@@ -1146,11 +1167,16 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
     fcolumns=get_columns_from_table('file')
     individual_results={}
     curs = mysql.connection.cursor()
-    old_i_id=i_id
-    if "(" in i_id:
+    print("....................................................")
+    print(i_id)
+    if "(" in i_id or '%28' in i_id:
         i_id=i_id[1:-1]
+        space_i_id=i_id.replace(",", ", ")
     else:
         session['criteria']=""
+        space_i_id=i_id.replace(",", ", ")
+    print("=====================================================")
+    print(i_id)
     list_i_id=i_id.split(',')
     list_i_name=[]
     for individual_id in list_i_id:
@@ -1214,8 +1240,9 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
         if len(session['criteria']) > 0:
             for_display=session['criteria']
         else:
-            for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+old_i_id+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/'+old_i_id+'/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
+            for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+space_i_id+")"
+        print(i_id)
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/('+i_id+')/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
 @app.route('/api/1.1/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_name(ind_name, ext_flag):
@@ -1242,7 +1269,7 @@ def get_individual_per_individual_name(ind_name, ext_flag):
         if ext_flag=='json':
             return get_individual_per_individual_id(i_id=results[1:], ext_flag=ext_flag)
         else:
-            return(redirect(url_for('get_individual_per_individual_id', i_id=results[1:], ext_flag=ext_flag)))
+            return(redirect(url_for('get_individual_per_individual_id', i_id=results[1:], db=db, ext_flag=ext_flag)))
 
 @app.route('/api/1.1/individual/<ext_flag>', methods=['GET'])
 def get_individuals(ext_flag):
@@ -1421,7 +1448,7 @@ def get_individual_per_location_id(loc_id, ext_flag):
         else:
             flash ("Error: no location associated with criteria provided")
     else:
-        list_individual_id=", ".join([str(x[0]) for x in res])
+        list_individual_id=",".join([str(x[0]) for x in res])
         session['criteria']="location name (location_id)= "+res[0][-1] +" ("+str(loc_id)+")"
         return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")",  ext_flag=ext_flag))
 
@@ -2111,7 +2138,7 @@ def get_individual_by_provider(p_id, ext_flag):
             flash ("Error: no individual associated with criteria provided")
             return redirect(url_for('index'))
     else:
-        list_individual_id=", ".join([str(x[1]) for x in results])
+        list_individual_id=",".join([str(x[1]) for x in results])
         session['criteria']="provider name (provider_id)= "+results[0][-1]+" ("+str(p_id)+")"
         return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")",  ext_flag=ext_flag))
 
