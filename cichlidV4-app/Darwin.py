@@ -1299,7 +1299,7 @@ def get_individuals(ext_flag):
             return jsonify(webresults_to_dic(json_results))
         else:
             if session.get('html', None) =='image':
-                return redirect(url_for('get_images',  ext_flag=ext_flag))
+                return redirect(url_for('get_images', ext_flag=ext_flag))
             else:
                 #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
                 return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[columns, remove_column(display_results, 'L')], plus=['/api/1.1/individual/all/web', 'yes'], db=db, ext_flag=ext_flag,  log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
@@ -1336,7 +1336,7 @@ def get_individuals_all(ext_flag):
             return jsonify(webresults_to_dic(json_results))
         else:
             if session.get('html', None) =='image':
-                return redirect(url_for('get_images',  ext_flag=ext_flag))
+                return redirect(url_for('get_images', ext_flag=ext_flag))
             else:
                 #for classical display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
                 return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['/api/1.1/individual/web', 'no'],db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
@@ -1364,7 +1364,7 @@ def get_lane_per_lane_id(l_id, ext_flag):
             flash ("Error: no lane associated with criteria provided")
     else:
         session['criteria']="lane accession (lane_id)= "+str(lresults[0][-1]) +" ("+str(l_id)+")"
-        return redirect(url_for('get_file_per_file_id', f_id=lresults[0][0],  ext_flag=ext_flag))
+        return redirect(url_for('get_file_per_file_id', f_id=lresults[0][0], ext_flag=ext_flag))
 
 @app.route('/api/1.1/lane/<ext_flag>', methods=['GET'])
 def get_lanes(ext_flag):
@@ -1447,7 +1447,7 @@ def get_individual_per_location_id(loc_id, ext_flag):
     else:
         list_individual_id=",".join([str(x[0]) for x in res])
         session['criteria']="location name (location_id)= "+res[0][-1] +" ("+str(loc_id)+")"
-        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")",  ext_flag=ext_flag))
+        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
 
 @app.route('/api/1.1/location/<loc_id>/individual/<ind_id>/<ext_flag>', methods=['GET'])
 def get_individual_per_id_and_per_location_id(loc_id, ind_id, ext_flag):
@@ -1467,7 +1467,7 @@ def get_individual_per_id_and_per_location_id(loc_id, ind_id, ext_flag):
     curs.close
     if len(lresults) > 0:
         results="("+",".join([str(x[0]) for x in lresults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,  ext_flag=ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
         if ext_flag=='json':
             return jsonify({'location_id=' +str(loc_id)+' and individual_id='+str(ind_id):'No data available'})
@@ -1492,7 +1492,7 @@ def get_individual_per_location(location, ext_flag):
     if len(lresults) > 0:
         results="("+",".join([str(x[0]) for x in lresults])+")"
         session['criteria']="location name (location_id)= "+location+" ("+str(lresults[0][-1])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,  ext_flag=ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
         if ext_flag=='json':
             return jsonify({'location name=' +location:'No data available'})
@@ -1517,7 +1517,7 @@ def get_individual_per_name_and_per_location(location, ind_name, ext_flag):
     curs.close()
     if len(lresults) > 0:
         results="("+",".join([str(x[0]) for x in lresults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,  ext_flag=ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
         if ext_flag=='json':
             return jsonify({'location name=' +location+' and individual name='+ind_name:'No data available'})
@@ -1543,7 +1543,7 @@ def get_samples_by_sample_name_and_location(sname, location, ext_flag):
     curs.close()
     if len(sresults) > 0:
         results="("+",".join([str(x[0]) for x in sresults])+")"
-        return(redirect(url_for('get_sample_per_sample_id', s_id=results,  ext_flag=ext_flag)))
+        return(redirect(url_for('get_sample_per_sample_id', s_id=results, ext_flag=ext_flag)))
     else:
         if ext_flag=='json':
             return jsonify({'location name=' +location+' and sample name='+sname:'No data available'})
@@ -1567,7 +1567,7 @@ def get_species_per_name_and_per_location(location, sp_name, ext_flag):
     curs.close()
     if len(spresults) > 0:
         results="("+",".join([str(x[0]) for x in spresults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,  ext_flag=ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
         if ext_flag=='json':
             return jsonify({'location name=' +location+' and species name='+sp_name:'No data available'})
@@ -1952,7 +1952,7 @@ def get_project_per_project_id_all(p_id, ext_flag):
     else:
         for_display="project name (project_id)= "+presults[0][1]+" ("+p_id+")"
         session['criteria']=for_display
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/api/1.1/project/'+p_id+'/web','no'], log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/api/1.1/project/'+p_id+'/web','no'], db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
 
 @app.route('/api/1.1/project/name/<accession>/<ext_flag>', methods=['GET'])
 def get_project_per_accession(accession, ext_flag):
@@ -1997,7 +1997,7 @@ def get_individual_per_project_accession_and_name(accession, ind_name, ext_flag)
     curs.close()
     if len(iresults) > 0:
         results="("+",".join([str(x[0]) for x in iresults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,  ext_flag=ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
         if ext_flag=='json':
             return jsonify({'project accession=' +accession+' and individual name='+ind_name:'No data available'})
@@ -2023,7 +2023,7 @@ def get_project_per_accession_and_location(accession, location, ext_flag):
     curs.close()
     if len(presults) > 0:
         results="("+",".join([str(x[0]) for x in presults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,  ext_flag=ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
         if ext_flag=='json':
             return jsonify({'project accession=' +accession+' and location name='+location:'No data available'})
@@ -2054,7 +2054,7 @@ def get_samples_by_sample_name_and_project(sname, accession, ext_flag):
     curs.close()
     if len(sresults) > 0:
         results="("+",".join([str(x[0]) for x in sresults])+")"
-        return(redirect(url_for('get_sample_per_sample_id', s_id=results,  ext_flag=ext_flag)))
+        return(redirect(url_for('get_sample_per_sample_id', s_id=results, ext_flag=ext_flag)))
     else:
         if ext_flag=='json':
             return jsonify({'project accession=' +accession+' and sample name='+sname:'No data available'})
@@ -2079,7 +2079,7 @@ def get_individual_per_project_accession_and_species(accession, sp_name, ext_fla
     curs.close()
     if len(iresults) > 0:
         results="("+",".join([str(x[0]) for x in iresults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,  ext_flag=ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
         if ext_flag=='json':
             return jsonify({'project accession=' +accession+' and species name='+sp_name:'No data available'})
@@ -2138,7 +2138,7 @@ def get_individual_by_provider(p_id, ext_flag):
     else:
         list_individual_id=",".join([str(x[1]) for x in results])
         session['criteria']="provider name (provider_id)= "+results[0][-1]+" ("+str(p_id)+")"
-        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")",  ext_flag=ext_flag))
+        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
 
 @app.route('/api/1.1/provider/<ext_flag>', methods=['GET'])
 def get_provider(ext_flag):
@@ -2563,7 +2563,7 @@ def get_species_per_name(sp_name, ext_flag):
     if len(spresults) > 0:
         results="("+",".join([str(x[0]) for x in spresults])+")"
         session['criteria']='species name (species_id)='+sp_name +" ("+str(spresults[0][-1])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,  ext_flag=ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
         if ext_flag=='json':
             return jsonify({'species_name='+sp_name:'No data available'})

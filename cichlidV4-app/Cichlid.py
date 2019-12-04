@@ -1,4 +1,4 @@
-= ext_flag#!/Library/Frameworks/Python.framework/Versions/3.7/bin/python3
+#!/Library/Frameworks/Python.framework/Versions/3.7/bin/python3
 
 from flask import Flask, render_template, request,  flash, redirect, url_for, session, send_file, jsonify
 from flask_mysqldb import MySQL
@@ -20,7 +20,6 @@ app = Flask(__name__)
 '''
 #initialisation of connection
 config_file_path=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/config/Cichlid_dbV4.json'
-# for web version: '/www/hd2/www-dev/other-sites/cichlid-tracking.sanger.ac.uk/cichlidV4-app/Cichlid_dbV4.json'
 configSettings = json.load(open(config_file_path, 'r'))
 app.config.from_object(Config)
 app.config['MYSQL_HOST'] = configSettings["MySQL_host"]
@@ -61,7 +60,7 @@ def add_individual_data_info(col, data):
             curs.execute("SELECT distinct * from individual_data where latest=1 and individual_id = '{indi}';". format(indi=data[0]))
             id_results=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch individual_data information")
@@ -115,7 +114,7 @@ def add_sample_info(col, data):
             curs.execute("SELECT distinct s.* from sample s left join material m on m.material_id=s.material_id where s.latest=1 and m.individual_id = '{indi}';". format(indi=data[0]))
             s_results=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch sample information")
@@ -127,7 +126,7 @@ def add_sample_info(col, data):
     curs.close()
     return new_col, new_data
 
-def change_for_display(col, data,  ext_flag=):
+def change_for_display(col, data, ext_flag):
     """ 1) change the table_ids in column names by the corresponding names/attributes for display
         2) change the table_id values in data by the corresponding name values for display
         3) deal when multicolumns of a table have to be displayed and call function to display all individual_data
@@ -217,7 +216,7 @@ def change_for_display(col, data,  ext_flag=):
                         else:
                             row[dic_index]=results[0][0]
                 except:
-                    if  ext_flag=='json':
+                    if ext_flag=='json':
                         return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
                     else:
                         flash ("Error: unable to fetch items: "+"SELECT "+table_dic[table_name_dic[dic_index]]+ " FROM "+table_name_dic[dic_index]+" WHERE "+table_name_dic[dic_index]+"_id = '{id}';". format(id=row[dic_index]))
@@ -230,6 +229,8 @@ def change_for_display(col, data,  ext_flag=):
                 for idx in range(1,2):
                     row.insert(column.index('species_name')+idx, '')
             else:
+                print(row)
+                print(column)
                 for idx in range(1,2):
                     row.insert(column.index('species_name')+idx, str(row[column.index('species_name')][idx]))
                 row[column.index('species_name')]= str(row[column.index('species_name')][0])
@@ -278,12 +279,12 @@ def change_for_display(col, data,  ext_flag=):
             list_new_data = reorder_for_vertical_display(list_new_data)
     return tuple(list_new_columns), tuple(list_new_data)
 
-def generate_json_for_display(res_dic, col_dic,  ext_flag=, identifier):
+def generate_json_for_display(res_dic, col_dic, ext_flag, identifier):
     '''reformat data as json for the web display and also to download as json '''
     '''
     input res_dic: dictionary of data to reformat with identifier as key and table data as value (dic)
     input col_dic: dictionary of column to reformat with table as key and table data as value (dic))
-    input  ext_flag=: suffix for the data (web for web display, json to download) (str)
+    input ext_flag: suffix for the data (web for web display, json to download) (str)
     input identifier: name of the primary identifier to use for the records in the download (str)
     return web_results: dictionary of reformatted data to display with table as key and column and table data  as value (dic)
     return json_results: dictionary of reformatted data to download with identifier & identifier_id as key and list of column and table data as value (dic)
@@ -306,9 +307,9 @@ def generate_json_for_display(res_dic, col_dic,  ext_flag=, identifier):
                 res.append([[table] + ['no data available for this table']])
             else:
                 if table in ('project'):
-                    new_columns, display_results= change_for_display([col_dic[table]],table_dic[table],  ext_flag=)
+                    new_columns, display_results= change_for_display([col_dic[table]],table_dic[table], ext_flag)
                 else:
-                    new_columns, display_results= change_for_display([col_dic[table][1:]], remove_column(table_dic[table],1),  ext_flag=)
+                    new_columns, display_results= change_for_display([col_dic[table][1:]], remove_column(table_dic[table],1), ext_flag)
                 complete_columns=[table]+list(new_columns[0])
                 for entry in display_results:
                     complete_results.append([table] +entry)
@@ -342,7 +343,7 @@ def get_columns_from_table(table_name):
         curs.execute("SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS where table_schema=  '"+configSettings['MySQL_db'] +"' and table_name='%s' ORDER BY ORDINAL_POSITION;" %table_name)
         columns=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch column names")
@@ -549,7 +550,7 @@ def verify_password(stored_password, provided_password):
     return pwdhash == stored_password
 
 ################### WEB APP FUNCTIONS ##########################################
-@app.route('/')
+#@app.route('/')
 #@app.route('/index')
 @app.route('/index', methods=['GET', 'POST'])
 def index():
@@ -558,7 +559,7 @@ def index():
     list_proj=[]
     list_loc =[]
     db='cichlid'
-     ext_flag=="web"
+    ext_flag="web"
     if 'usrname' not in session:
         session['usrname']=""
         session['logged_in']=0
@@ -571,7 +572,7 @@ def index():
         curs.execute("SELECT accession, name FROM project")
         prows=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch projects")
@@ -579,7 +580,7 @@ def index():
         curs.execute("SELECT distinct location FROM location where location is not NULL")
         lrows=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch location information")
@@ -639,41 +640,41 @@ def index():
         'SX':[sample_name, species_name], 'AX':[sample_name, project_acc.split(" - ")[0]],
         'IX' : [sample_name, individual_name], 'XL' : [sample_name, loc_region]}
         if flag == 'A':
-            return redirect(url_for(url_dic[flag], accession=arg_dic[flag],  ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], accession=arg_dic[flag], ext_flag=ext_flag))
         elif flag == 'AI':
-            return redirect(url_for(url_dic[flag], accession=arg_dic[flag][0], ind_name=arg_dic[flag][1],   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], accession=arg_dic[flag][0], ind_name=arg_dic[flag][1],  ext_flag=ext_flag))
         elif flag == 'AS':
-                return redirect(url_for(url_dic[flag], accession=arg_dic[flag][0], sp_name=arg_dic[flag][1],   ext_flag= ext_flag))
+                return redirect(url_for(url_dic[flag], accession=arg_dic[flag][0], sp_name=arg_dic[flag][1],  ext_flag=ext_flag))
         elif flag=='I':
 
-            return redirect(url_for(url_dic[flag], ind_name= individual_name,   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], ind_name= individual_name,  ext_flag=ext_flag))
         elif flag=='IS':
-            return redirect(url_for(url_dic[flag], ind_name= individual_name, sp_name=arg_dic[flag][1],   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], ind_name= individual_name, sp_name=arg_dic[flag][1],  ext_flag=ext_flag))
         elif flag=='S':
-            return redirect(url_for(url_dic[flag], sp_name=species_name,   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], sp_name=species_name,  ext_flag=ext_flag))
         elif flag =='L':
-            return redirect(url_for(url_dic[flag], location=loc_region,   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], location=loc_region,  ext_flag=ext_flag))
         elif flag =='SL':
-            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], sp_name=arg_dic[flag][0],   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], sp_name=arg_dic[flag][0],  ext_flag=ext_flag))
         elif flag =='IL':
 
-            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], ind_name=arg_dic[flag][0],   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], ind_name=arg_dic[flag][0],  ext_flag=ext_flag))
         elif flag =='AL':
-            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], accession=arg_dic[flag][0],   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], accession=arg_dic[flag][0],  ext_flag=ext_flag))
         elif flag =='X':
-            return redirect(url_for(url_dic[flag], sname=sample_name,   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], sname=sample_name,  ext_flag=ext_flag))
         elif flag =='XL':
-            return redirect(url_for(url_dic[flag], sname=sample_name, location=loc_region,   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], sname=sample_name, location=loc_region,  ext_flag=ext_flag))
         elif flag =='IX':
-            return redirect(url_for(url_dic[flag], sname=sample_name, ind_name=individual_name,   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], sname=sample_name, ind_name=individual_name,  ext_flag=ext_flag))
         elif flag =='SX':
-            return redirect(url_for(url_dic[flag], sname=sample_name, sp_name=species_name,   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], sname=sample_name, sp_name=species_name,  ext_flag=ext_flag))
         elif flag =='AX':
-            return redirect(url_for(url_dic[flag], sname=sample_name, accession=arg_dic[flag][-1],   ext_flag= ext_flag))
+            return redirect(url_for(url_dic[flag], sname=sample_name, accession=arg_dic[flag][-1],  ext_flag=ext_flag))
         else:
             return redirect(url_for('index'))
             flash("Please enter valid criteria")
-    return render_template("entry.html", title='Query was: returnall', form=form, project_list=tuple(list_proj), loc_list=tuple(list_loc), db=db,  ext_flag= ext_flag, log=status, usrname=session.get('usrname', None))
+    return render_template("entry.html", title='Query was: returnall', form=form, project_list=tuple(list_proj), loc_list=tuple(list_loc), db=db, ext_flag=ext_flag, log=status, usrname=session.get('usrname', None))
 
 @app.route('/dashboard/')
 def dashboard():
@@ -690,7 +691,7 @@ def enter_data():
         curs.execute("SELECT distinct provider_name FROM provider")
         provider_res=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch provider names")
@@ -723,7 +724,7 @@ def login():
             curs.execute("SELECT * FROM users where username ='%s';" % details['username'])
             rows=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch items")
@@ -836,8 +837,8 @@ def faq():
     return render_template("faq.html", db=db, log=session['logged_in'], proj=proj, usrname=session.get('usrname', None))
 
 ################### API RELATED FUNCTIONS ######################################
-@app.route('/api/1.1/file/<f_id>/< ext_flag=>', methods=['GET'])
-def get_file_per_file_id(f_id,  ext_flag=):
+@app.route('/api/1.1/file/<f_id>/<ext_flag>', methods=['GET'])
+def get_file_per_file_id(f_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
     mcolumns=['row_id', 'material_id', 'individual_id', 'name', 'date_received', 'type', 'developmental_stage_id', 'organism_part_id']
@@ -852,7 +853,7 @@ def get_file_per_file_id(f_id,  ext_flag=):
         f.lane_id =l.lane_id where f.file_id = '%s'" % f_id)
         presults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table project from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch project data")
@@ -863,7 +864,7 @@ def get_file_per_file_id(f_id,  ext_flag=):
         i.latest=1 and f.file_id ='%s'" % f_id)
         iresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table individual from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individual data")
@@ -874,7 +875,7 @@ def get_file_per_file_id(f_id,  ext_flag=):
         file f on f.lane_id = l.lane_id where m.latest = 1 and f.file_id ='%s'" %f_id)
         mresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table material from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch material data")
@@ -884,7 +885,7 @@ def get_file_per_file_id(f_id,  ext_flag=):
         and f.file_id  ='%s'" % f_id)
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table sample from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch sample data")
@@ -893,7 +894,7 @@ def get_file_per_file_id(f_id,  ext_flag=):
         f.total_length, f.average_length FROM file f where f.latest =1 and f.file_id ='%s'" % f_id)
         fresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table file from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch file data")
@@ -901,8 +902,8 @@ def get_file_per_file_id(f_id,  ext_flag=):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     file_results[f_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    json_results, web_results=generate_json_for_display(file_results, col_dic,  ext_flag=, "file")
-    if  ext_flag=='json':
+    json_results, web_results=generate_json_for_display(file_results, col_dic, ext_flag, "file")
+    if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
     else:
         if len(session['criteria']) > 0:
@@ -911,8 +912,8 @@ def get_file_per_file_id(f_id,  ext_flag=):
             for_display="file name (file_id)= '"+fresults[0][3]+"' ("+str(f_id)+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['file',  0, '/web' ], results=web_results, plus=['/api/1.1/file/'+f_id+'/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='file')
 
-@app.route('/api/1.1/file/<f_id>/all/< ext_flag=>', methods=['GET'])
-def get_file_per_file_id_all(f_id,  ext_flag=):
+@app.route('/api/1.1/file/<f_id>/all/<ext_flag>', methods=['GET'])
+def get_file_per_file_id_all(f_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
     mcolumns=get_columns_from_table('material')
@@ -927,7 +928,7 @@ def get_file_per_file_id_all(f_id,  ext_flag=):
         f.lane_id =l.lane_id where f.file_id = '%s'" % f_id)
         presults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table project from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch project data")
@@ -937,7 +938,7 @@ def get_file_per_file_id_all(f_id,  ext_flag=):
          join file f on f.lane_id = l.lane_id where i.latest=1 and f.file_id ='%s'" % f_id)
         iresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table individual from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individual data")
@@ -947,7 +948,7 @@ def get_file_per_file_id_all(f_id,  ext_flag=):
         file f on f.lane_id = l.lane_id where m.latest = 1 and f.file_id ='%s'" %f_id)
         mresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table material from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch material data")
@@ -956,7 +957,7 @@ def get_file_per_file_id_all(f_id,  ext_flag=):
         left join file f on f.lane_id = l.lane_id where s.latest=1 and f.file_id  ='%s'" % f_id)
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table sample from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch sample data")
@@ -964,7 +965,7 @@ def get_file_per_file_id_all(f_id,  ext_flag=):
         curs.execute("select distinct f.* FROM file f where f.latest =1 and f.file_id ='%s'" % f_id)
         fresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table file from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch file data")
@@ -972,8 +973,8 @@ def get_file_per_file_id_all(f_id,  ext_flag=):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     file_results[f_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    json_results, web_results=generate_json_for_display(file_results, col_dic,  ext_flag=, "file")
-    if  ext_flag=='json':
+    json_results, web_results=generate_json_for_display(file_results, col_dic, ext_flag, "file")
+    if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
     else:
         if len(session['criteria']) > 0:
@@ -982,8 +983,8 @@ def get_file_per_file_id_all(f_id,  ext_flag=):
             for_display="file name (file_id)= '"+fresults[0][3]+"' ("+str(f_id)+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['file',  0, '/web' ], results=web_results, plus=['/api/1.1/file/'+f_id+'/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='file')
 
-@app.route('/api/1.1/image/<im_id>/< ext_flag=>', methods=['GET'])
-def get_image_per_image_id(im_id,  ext_flag=):
+@app.route('/api/1.1/image/<im_id>/<ext_flag>', methods=['GET'])
+def get_image_per_image_id(im_id, ext_flag):
     results=[]
     columns=get_columns_from_table('image')
     col=[columns[0]]+[columns[2]]+[columns[1]]+['thumbnail']+list(columns[3:])
@@ -993,22 +994,22 @@ def get_image_per_image_id(im_id,  ext_flag=):
         curs.execute("SELECT individual_id, filename FROM image where latest=1 and image_id = '%s';" % im_id)
         img_results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch images")
     curs.close()
     if len(img_results)==0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no individual associated with criteria provided"})
         else:
             flash ("Error: no individual associated with criteria provided")
     else:
         session['criteria']="image name (image_id)= "+str(img_results[0][-1]) +" ("+str(im_id)+")"
-        return redirect(url_for('get_individual_per_individual_id', i_id="("+str(img_results[0][0])+")",  ext_flag= ext_flag))
+        return redirect(url_for('get_individual_per_individual_id', i_id="("+str(img_results[0][0])+")", ext_flag=ext_flag))
 
-@app.route('/api/1.1/image/< ext_flag=>', methods=['GET'])
-def get_images( ext_flag=):
+@app.route('/api/1.1/image/<ext_flag>', methods=['GET'])
+def get_images(ext_flag):
     results=[]
     columns=get_columns_from_table('image')
     col=[columns[0]]+[columns[2]]+[columns[1]]+['thumbnail']+[columns[4]]
@@ -1018,13 +1019,13 @@ def get_images( ext_flag=):
         curs.execute("SELECT * FROM image where latest=1")
         img_results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch images")
     curs.close()
     if len(img_results) ==0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no image data available in the database '"+db+"'"})
         else:
             flash ("Error: no image data available in the database '"+db+"'")
@@ -1032,16 +1033,16 @@ def get_images( ext_flag=):
     for row in img_results:
         i_results=[row[0]]+[row[2]]+[row[1]]+list([row[3]+"/"+row[2]])+[row[4]]
         results.append(tuple(i_results))
-    new_column, display_results= change_for_display([columns], results,  ext_flag=)
-    if  ext_flag=='json':
+    new_column, display_results= change_for_display([columns], results, ext_flag)
+    if ext_flag=='json':
         json_results=tuple_to_dic(new_column[0],display_results, "images")
         return jsonify(webresults_to_dic(json_results))
     else:
         #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed)crumbs (to display navigation history))
         return render_template("mysql.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/image/all/< ext_flag=>', methods=['GET'])
-def get_images_all( ext_flag=):
+@app.route('/api/1.1/image/all/<ext_flag>', methods=['GET'])
+def get_images_all(ext_flag):
     results=[]
     columns=get_columns_from_table('image')
     col=[columns[0]]+[columns[2]]+[columns[1]]+['thumbnail']+list(columns[3:])
@@ -1051,13 +1052,13 @@ def get_images_all( ext_flag=):
         curs.execute("SELECT * FROM image where latest=1")
         img_results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch images")
     curs.close()
     if len(img_results)==0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no image data available in the database '"+db+"'"})
         else:
             flash ("Error: no image data available in the database '"+db+"'")
@@ -1066,16 +1067,16 @@ def get_images_all( ext_flag=):
         for row in img_results:
             i_results=[row[0]]+[row[2]]+[row[1]]+list([row[3]+"/"+row[2]])+list(row[3:])
             results.append(tuple(i_results))
-        new_column, display_results= change_for_display([columns], results,  ext_flag=)
-        if  ext_flag=='json':
+        new_column, display_results= change_for_display([columns], results, ext_flag)
+        if ext_flag=='json':
             json_results=tuple_to_dic(new_column[0],display_results, "images")
             return jsonify(webresults_to_dic(json_results))
         else:
             #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
             return render_template("mysql.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['/api/1.1/image/web', 'no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/individual/<i_id>/< ext_flag=>', methods=['GET'])
-def get_individual_per_individual_id(i_id,  ext_flag=):
+@app.route('/api/1.1/individual/<i_id>/<ext_flag>', methods=['GET'])
+def get_individual_per_individual_id(i_id, ext_flag):
     pcolumns=list(get_columns_from_table('project'))
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
     mcolumns=['row_id', 'material_id', 'individual_id', 'name', 'date_received', 'type', 'developmental_stage_id', 'organism_part_id', 'sample(s)']
@@ -1098,7 +1099,7 @@ def get_individual_per_individual_id(i_id,  ext_flag=):
             individual i on i.individual_id=a.individual_id where i.latest=1 and i.individual_id = %s" % individual_id)
             presults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table project from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch project data")
@@ -1107,7 +1108,7 @@ def get_individual_per_individual_id(i_id,  ext_flag=):
             where i.latest=1 and i.individual_id = %s" % individual_id)
             iresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table individual from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch individual data")
@@ -1119,7 +1120,7 @@ def get_individual_per_individual_id(i_id,  ext_flag=):
             from material m where m.individual_id = {individual_id}" .format(individual_id = individual_id))
             mresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table material from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch material data")
@@ -1128,7 +1129,7 @@ def get_individual_per_individual_id(i_id,  ext_flag=):
             on m.material_id = s.material_id where s.latest=1 and m.latest=1 and m.individual_id  = %s" % individual_id)
             sresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table sample from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch sample data")
@@ -1139,7 +1140,7 @@ def get_individual_per_individual_id(i_id,  ext_flag=):
             m.latest=1 and s.latest=1 and l.latest=1 and f.latest =1 and m.individual_id = %s" % individual_id)
             fresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table file from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch file data")
@@ -1147,8 +1148,8 @@ def get_individual_per_individual_id(i_id,  ext_flag=):
         individual_results[individual_id]=table_dic
     curs.close()
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    json_results, web_results=generate_json_for_display(individual_results, col_dic,  ext_flag=, "individual")
-    if  ext_flag=='json':
+    json_results, web_results=generate_json_for_display(individual_results, col_dic, ext_flag, "individual")
+    if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
     else:
         if len(session['criteria']) > 0:
@@ -1157,8 +1158,8 @@ def get_individual_per_individual_id(i_id,  ext_flag=):
             for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+space_i_id+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/('+i_id+')/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
-@app.route('/api/1.1/individual/<i_id>/all/< ext_flag=>', methods=['GET'])
-def get_individual_per_individual_id_all(i_id,  ext_flag=):
+@app.route('/api/1.1/individual/<i_id>/all/<ext_flag>', methods=['GET'])
+def get_individual_per_individual_id_all(i_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     ind_columns=get_columns_from_table('individual')
     ind_id_columns=get_columns_from_table('individual_data')
@@ -1182,7 +1183,7 @@ def get_individual_per_individual_id_all(i_id,  ext_flag=):
             individual i on i.individual_id=a.individual_id where i.latest=1 and i.individual_id =  %s" % individual_id)
             presults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table project from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch project data")
@@ -1194,7 +1195,7 @@ def get_individual_per_individual_id_all(i_id,  ext_flag=):
             where i.latest=1 and i.individual_id = %s" % individual_id)
             iresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table individual from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch individual data")
@@ -1203,7 +1204,7 @@ def get_individual_per_individual_id_all(i_id,  ext_flag=):
             curs.execute("select distinct m.* FROM material m where m.latest=1 and m.individual_id = %s" % individual_id)
             mresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table material from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch material data")
@@ -1212,7 +1213,7 @@ def get_individual_per_individual_id_all(i_id,  ext_flag=):
             on m.material_id = s.material_id where s.latest=1 and m.latest=1 and m.individual_id  = %s" % individual_id)
             sresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table sample from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch sample data")
@@ -1222,7 +1223,7 @@ def get_individual_per_individual_id_all(i_id,  ext_flag=):
             m.latest=1 and s.latest=1 and l.latest=1 and f.latest =1 and m.individual_id = %s" % individual_id)
             fresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table file from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch file data")
@@ -1230,8 +1231,8 @@ def get_individual_per_individual_id_all(i_id,  ext_flag=):
         individual_results[individual_id]=table_dic
     curs.close()
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    json_results, web_results=generate_json_for_display(individual_results, col_dic,  ext_flag=, "individual")
-    if  ext_flag=='json':
+    json_results, web_results=generate_json_for_display(individual_results, col_dic, ext_flag, "individual")
+    if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
     else:
         if len(session['criteria']) > 0:
@@ -1240,8 +1241,8 @@ def get_individual_per_individual_id_all(i_id,  ext_flag=):
             for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+space_i_id+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/('+i_id+')/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
-@app.route('/api/1.1/individual/name/<ind_name>/< ext_flag=>', methods=['GET'])
-def get_individual_per_individual_name(ind_name,  ext_flag=):
+@app.route('/api/1.1/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+def get_individual_per_individual_name(ind_name, ext_flag):
     ind_list=ind_name.replace(" ","").replace(",", "','")
     results=""
     curs = mysql.connection.cursor()
@@ -1249,26 +1250,26 @@ def get_individual_per_individual_name(ind_name,  ext_flag=):
         curs.execute("SELECT distinct i.individual_id, im.image_id FROM individual i left join image im on i.individual_id=im.individual_id where i.latest=1 and i.name in ('{identif}') or i.alias in ('{identif}') ". format(identif=ind_list))
         i_results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individuals")
     curs.close()
     if len(i_results)==0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no individual associated with criteria provided"})
         else:
             flash ("Error: no individual associated with criteria provided")
     else:
         for row in i_results:
             results+=","+str(row[0])
-        if  ext_flag=='json':
-            return get_individual_per_individual_id(i_id=results[1:],  ext_flag= ext_flag)
+        if ext_flag=='json':
+            return get_individual_per_individual_id(i_id=results[1:], ext_flag=ext_flag)
         else:
-            return(redirect(url_for('get_individual_per_individual_id', i_id=results[1:], db=db,  ext_flag= ext_flag)))
+            return(redirect(url_for('get_individual_per_individual_id', i_id=results[1:], db=db, ext_flag=ext_flag)))
 
-@app.route('/api/1.1/individual/< ext_flag=>', methods=['GET'])
-def get_individuals( ext_flag=):
+@app.route('/api/1.1/individual/<ext_flag>', methods=['GET'])
+def get_individuals(ext_flag):
     icolumns=get_columns_from_table('individual')
     columns=list(icolumns[1:8]+tuple(['samples']))
     curs = mysql.connection.cursor()
@@ -1279,32 +1280,32 @@ def get_individuals( ext_flag=):
         i.alias, i.species_id, i.sex, i.accession, i.location_id")
         iresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individuals")
     curs.close()
     if len(iresults)==0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no individual data available in the database '"+db+"'"})
         else:
             flash ("Error: no individual data available in the database '"+db+"'")
     else:
-        new_columns, results= change_for_display(list([tuple(columns)]), list(iresults),  ext_flag=)
+        new_columns, results= change_for_display(list([tuple(columns)]), list(iresults), ext_flag)
         display_results=remove_column(remove_column(results, -3), -2)
         columns=new_columns[0][:-4]+new_columns[0][-2:-1]
-        if  ext_flag=='json':
+        if ext_flag=='json':
             json_results=tuple_to_dic(columns, remove_column(display_results, 'L'), "individuals")
             return jsonify(webresults_to_dic(json_results))
         else:
             if session.get('html', None) =='image':
-                return redirect(url_for('get_images',   ext_flag= ext_flag))
+                return redirect(url_for('get_images', ext_flag=ext_flag))
             else:
                 #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
-                return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[columns, remove_column(display_results, 'L')], plus=['/api/1.1/individual/all/web', 'yes'], db=db,  ext_flag= ext_flag,  log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
+                return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[columns, remove_column(display_results, 'L')], plus=['/api/1.1/individual/all/web', 'yes'], db=db, ext_flag=ext_flag,  log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
-@app.route('/api/1.1/individual/all/< ext_flag=>', methods=['GET'])
-def get_individuals_all( ext_flag=):
+@app.route('/api/1.1/individual/all/<ext_flag>', methods=['GET'])
+def get_individuals_all(ext_flag):
     ind_columns=get_columns_from_table('individual')
     ind_id_columns=get_columns_from_table('individual_data')
     icolumns=ind_columns[:12]+ind_id_columns[2:6]+ind_columns[12:]
@@ -1318,30 +1319,30 @@ def get_individuals_all( ext_flag=):
         i.date_collected, i.collection_method, i.collection_details,  id.cv_id, id.value, id.unit, id.comment, i.father_id, i.mother_id, i.changed, i.latest")
         iresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individuals")
     curs.close()
     if len(iresults)==0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no individual data available in the database '"+db+"'"})
         else:
             flash ("Error: no individual data available in the database '"+db+"'")
     else:
-        new_columns, display_results= change_for_display(list([tuple(columns)]), list(iresults),  ext_flag=)
-        if  ext_flag=='json':
+        new_columns, display_results= change_for_display(list([tuple(columns)]), list(iresults), ext_flag)
+        if ext_flag=='json':
             json_results=tuple_to_dic(new_columns[0][:-1], remove_column(display_results, 'L'), "individuals")
             return jsonify(webresults_to_dic(json_results))
         else:
             if session.get('html', None) =='image':
-                return redirect(url_for('get_images',   ext_flag= ext_flag))
+                return redirect(url_for('get_images', ext_flag=ext_flag))
             else:
                 #for classical display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
                 return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['/api/1.1/individual/web', 'no'],db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/lane/<l_id>/< ext_flag=>', methods=['GET'])
-def get_lane_per_lane_id(l_id,  ext_flag=):
+@app.route('/api/1.1/lane/<l_id>/<ext_flag>', methods=['GET'])
+def get_lane_per_lane_id(l_id, ext_flag):
     results=[]
     lane_acc_dic={}
     lcolumns=get_columns_from_table('lane')
@@ -1351,22 +1352,22 @@ def get_lane_per_lane_id(l_id,  ext_flag=):
         curs.execute("SELECT distinct f.file_id, l.accession FROM file f join lane l on l.lane_id=f.file_id where f.latest=1 and f.lane_id = '%s';" % l_id)
         lresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch lanes")
     curs.close()
     if len(lresults)==0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no lane associated with criteria provided"})
         else:
             flash ("Error: no lane associated with criteria provided")
     else:
         session['criteria']="lane accession (lane_id)= "+str(lresults[0][-1]) +" ("+str(l_id)+")"
-        return redirect(url_for('get_file_per_file_id', f_id=lresults[0][0],   ext_flag= ext_flag))
+        return redirect(url_for('get_file_per_file_id', f_id=lresults[0][0], ext_flag=ext_flag))
 
-@app.route('/api/1.1/lane/< ext_flag=>', methods=['GET'])
-def get_lanes( ext_flag=):
+@app.route('/api/1.1/lane/<ext_flag>', methods=['GET'])
+def get_lanes(ext_flag):
     lcolumns=get_columns_from_table('lane')
     columns=tuple([lcolumns[1]])+tuple([lcolumns[6]])+tuple([lcolumns[2]])+tuple([lcolumns[3]]) +tuple([lcolumns[6]]) +tuple([lcolumns[7]]) + tuple(["files"])
     curs = mysql.connection.cursor()
@@ -1376,26 +1377,26 @@ def get_lanes( ext_flag=):
         l.lane_id,l.name,l.sample_id, l.seq_tech_id, l.library_id, l.accession")
         lresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch lanes")
     curs.close()
     if len(lresults)==0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no lane data available in the database '"+db+"'"})
         else:
             flash ("Error: no lane data available in the database '"+db+"'")
     else:
-        new_column, display_results= change_for_display([columns], list(lresults),  ext_flag=)
-        if  ext_flag=='json':
+        new_column, display_results= change_for_display([columns], list(lresults), ext_flag)
+        if ext_flag=='json':
             json_results=tuple_to_dic(new_column[0], display_results, "lanes")
             return jsonify(webresults_to_dic(json_results))
         else:
             return render_template("mysql.html", title='Query was: all lanes', url_param=['lane', 0, '/web'], results=[new_column[0], display_results], plus =['all/web','yes'], db=db, log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/lane/all/< ext_flag=>', methods=['GET'])
-def get_lanes_all( ext_flag=):
+@app.route('/api/1.1/lane/all/<ext_flag>', methods=['GET'])
+def get_lanes_all(ext_flag):
     lcolumns=get_columns_from_table('lane')
     columns=[lcolumns[1]]+[lcolumns[6]]+list(lcolumns[2:6]) + list(lcolumns[7:] +tuple(["files"]))
     curs = mysql.connection.cursor()
@@ -1405,26 +1406,26 @@ def get_lanes_all( ext_flag=):
         l.seq_centre_id, l.library_id, l.accession,l.ss_qc_status, l.auto_qc_status, l.manually_withdrawn, l.run_date, l.changed, l.latest")
         lresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch lanes")
     curs.close()
     if len(lresults)==0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no lane data available in the database '"+db+"'"})
         else:
             flash ("Error: no lane data available in the database '"+db+"'")
     else:
-        new_column, display_results= change_for_display([columns], lresults,  ext_flag=)
-        if  ext_flag=='json':
+        new_column, display_results= change_for_display([columns], lresults, ext_flag)
+        if ext_flag=='json':
             json_results=tuple_to_dic(new_column[0], display_results, "lanes")
             return jsonify(webresults_to_dic(json_results))
         else:
             return render_template("mysql.html", title='Query was: all lanes', url_param=['lane', 0, '/web'], results=[new_column[0], display_results], plus=['/api/1.1/lane/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/location/<loc_id>/< ext_flag=>', methods=['GET'])
-def get_individual_per_location_id(loc_id,  ext_flag=):
+@app.route('/api/1.1/location/<loc_id>/<ext_flag>', methods=['GET'])
+def get_individual_per_location_id(loc_id, ext_flag):
     columns=get_columns_from_table('individual')[1:]
     results=[]
     curs = mysql.connection.cursor()
@@ -1433,23 +1434,23 @@ def get_individual_per_location_id(loc_id,  ext_flag=):
         where i.location_id = %s and i.latest=1;" % loc_id)
         res=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individuals")
     curs.close()
     if len(res)==0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no location associated with criteria provided"})
         else:
             flash ("Error: no location associated with criteria provided")
     else:
         list_individual_id=",".join([str(x[0]) for x in res])
         session['criteria']="location name (location_id)= "+res[0][-1] +" ("+str(loc_id)+")"
-        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")",   ext_flag= ext_flag))
+        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
 
-@app.route('/api/1.1/location/<loc_id>/individual/<ind_id>/< ext_flag=>', methods=['GET'])
-def get_individual_per_id_and_per_location_id(loc_id, ind_id,  ext_flag=):
+@app.route('/api/1.1/location/<loc_id>/individual/<ind_id>/<ext_flag>', methods=['GET'])
+def get_individual_per_id_and_per_location_id(loc_id, ind_id, ext_flag):
     list_loc_id ="("+loc_id+")"
     loc_columns=get_columns_from_table('individual')
     columns=loc_columns[1:8]
@@ -1459,23 +1460,23 @@ def get_individual_per_id_and_per_location_id(loc_id, ind_id,  ext_flag=):
         join species S on S.species_id = I.species_id where I.latest=1 and L.location_id in {reg} and I.individual_id = '{indl}' ;". format(reg=list_loc_id, indl=ind_id))
         lresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch location and / or individual")
     curs.close
     if len(lresults) > 0:
         results="("+",".join([str(x[0]) for x in lresults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,   ext_flag= ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'location_id=' +str(loc_id)+' and individual_id='+str(ind_id):'No data available'})
         else:
             flash ("no location associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/location/name/<location>/< ext_flag=>', methods=['GET'])
-def get_individual_per_location(location,  ext_flag=):
+@app.route('/api/1.1/location/name/<location>/<ext_flag>', methods=['GET'])
+def get_individual_per_location(location, ext_flag):
     loc_columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
@@ -1483,7 +1484,7 @@ def get_individual_per_location(location,  ext_flag=):
         l.location_id = i.location_id where i.latest=1 and l.location = '{loc}' or sub_location = '{loc}';". format(loc=location))
         lresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch location")
@@ -1491,16 +1492,16 @@ def get_individual_per_location(location,  ext_flag=):
     if len(lresults) > 0:
         results="("+",".join([str(x[0]) for x in lresults])+")"
         session['criteria']="location name (location_id)= "+location+" ("+str(lresults[0][-1])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,   ext_flag= ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'location name=' +location:'No data available'})
         else:
             flash ("no location associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/location/name/<location>/individual/name/<ind_name>/< ext_flag=>', methods=['GET'])
-def get_individual_per_name_and_per_location(location, ind_name,  ext_flag=):
+@app.route('/api/1.1/location/name/<location>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+def get_individual_per_name_and_per_location(location, ind_name, ext_flag):
     ind_list=ind_name.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
     try:
@@ -1509,23 +1510,23 @@ def get_individual_per_name_and_per_location(location, ind_name,  ext_flag=):
         or i.alias in ('{indl}')) ;". format(reg=location, indl=ind_list))
         lresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch location and / or individual")
     curs.close()
     if len(lresults) > 0:
         results="("+",".join([str(x[0]) for x in lresults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,   ext_flag= ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'location name=' +location+' and individual name='+ind_name:'No data available'})
         else:
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/location/name/<location>/sample/name/<sname>/< ext_flag=>', methods=['GET'])
-def get_samples_by_sample_name_and_location(sname, location,  ext_flag=):
+@app.route('/api/1.1/location/name/<location>/sample/name/<sname>/<ext_flag>', methods=['GET'])
+def get_samples_by_sample_name_and_location(sname, location, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]
     curs = mysql.connection.cursor()
@@ -1535,23 +1536,23 @@ def get_samples_by_sample_name_and_location(sname, location,  ext_flag=):
         and (s.accession in {s_list} or s.name in {s_list}) and l.location='{loc}';".format(loc=location, s_list=s_list))
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch samples with these criteria")
     curs.close()
     if len(sresults) > 0:
         results="("+",".join([str(x[0]) for x in sresults])+")"
-        return(redirect(url_for('get_sample_per_sample_id', s_id=results,   ext_flag= ext_flag)))
+        return(redirect(url_for('get_sample_per_sample_id', s_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'location name=' +location+' and sample name='+sname:'No data available'})
         else:
             flash ("no sample associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/location/name/<location>/species/name/<sp_name>/< ext_flag=>', methods=['GET'])
-def get_species_per_name_and_per_location(location, sp_name,  ext_flag=):
+@app.route('/api/1.1/location/name/<location>/species/name/<sp_name>/<ext_flag>', methods=['GET'])
+def get_species_per_name_and_per_location(location, sp_name, ext_flag):
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT distinct i.individual_id FROM individual i join location l on l.location_id = l.location_id \
@@ -1559,23 +1560,23 @@ def get_species_per_name_and_per_location(location, sp_name,  ext_flag=):
         (s.name like '%%{spn}%%' or s.common_name like '%%{spn}%%');". format(reg=location, spn=sp_name))
         spresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch location and / or species")
     curs.close()
     if len(spresults) > 0:
         results="("+",".join([str(x[0]) for x in spresults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,   ext_flag= ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'location name=' +location+' and species name='+sp_name:'No data available'})
         else:
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/location/< ext_flag=>', methods=['GET'])
-def get_location( ext_flag=):
+@app.route('/api/1.1/location/<ext_flag>', methods=['GET'])
+def get_location(ext_flag):
     loc_columns=get_columns_from_table('location')
     columns=list(loc_columns)+["species", "individuals"]
     results=[]
@@ -1586,13 +1587,13 @@ def get_location( ext_flag=):
         where  i.latest = 1 group by l.location_id, l.country_of_origin, l.location, l.sub_location, l.latitude, l.longitude")
         l_results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch locations")
     curs.close()
     if len(l_results) == 0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no location data available in the database '"+db+"'"})
         else:
             flash ("Error: no location data available in the database '"+db+"'")
@@ -1603,14 +1604,14 @@ def get_location( ext_flag=):
             row[4]=str(row[4])
             row[5]=str(row[5])
             results.append(row)
-        if  ext_flag=='json':
+        if ext_flag=='json':
             json_results=tuple_to_dic(columns, results, "locations")
             return jsonify(webresults_to_dic(json_results))
         else:
             return render_template("mysql.html", title='Query was: all locations', url_param=['location',0, '/web'], results=[columns,results], plus =['.',''], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/material/<m_id>/< ext_flag=>', methods=['GET'])
-def get_material_per_material_id(m_id,  ext_flag=):
+@app.route('/api/1.1/material/<m_id>/<ext_flag>', methods=['GET'])
+def get_material_per_material_id(m_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
     mcolumns=['row_id', 'material_id', 'individual_id', 'name', 'date_received', 'type', 'developmental_stage_id', 'organism_part_id']
@@ -1624,7 +1625,7 @@ def get_material_per_material_id(m_id,  ext_flag=):
         m.material_id = '%s'" % m_id)
         presults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table project from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch project data")
@@ -1633,7 +1634,7 @@ def get_material_per_material_id(m_id,  ext_flag=):
         join material m on m.individual_id = i.individual_id where i.latest=1 and m.material_id ='%s'" % m_id)
         iresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table individual from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individual data")
@@ -1642,7 +1643,7 @@ def get_material_per_material_id(m_id,  ext_flag=):
         m.developmental_stage_id, m.organism_part_id FROM material m where m.latest=1 and m.material_id ='%s'" %m_id)
         mresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table material from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch material data")
@@ -1651,7 +1652,7 @@ def get_material_per_material_id(m_id,  ext_flag=):
         on m.material_id = s.material_id where s.latest=1 and m.material_id  ='%s'" % m_id)
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table sample from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch sample data")
@@ -1662,7 +1663,7 @@ def get_material_per_material_id(m_id,  ext_flag=):
         m.latest=1 and s.latest=1 and l.latest=1 and f.latest =1 and m.material_id ='%s'" % m_id)
         fresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table file from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch file data")
@@ -1670,15 +1671,15 @@ def get_material_per_material_id(m_id,  ext_flag=):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     material_results[m_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    json_results, web_results=generate_json_for_display(material_results, col_dic,  ext_flag=, "material")
-    if  ext_flag=='json':
+    json_results, web_results=generate_json_for_display(material_results, col_dic, ext_flag, "material")
+    if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="material name (material_id)= "+mresults[0][3]+" ("+str(m_id)+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['material',  0, '/web' ], results=web_results, plus=['/api/1.1/material/'+m_id+'/all/web','yes'],db=db,  ext_flag= ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='material')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['material',  0, '/web' ], results=web_results, plus=['/api/1.1/material/'+m_id+'/all/web','yes'],db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='material')
 
-@app.route('/api/1.1/material/<m_id>/all/< ext_flag=>', methods=['GET'])
-def get_material_per_material_id_all(m_id,  ext_flag=):
+@app.route('/api/1.1/material/<m_id>/all/<ext_flag>', methods=['GET'])
+def get_material_per_material_id_all(m_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
     mcolumns=get_columns_from_table('material')
@@ -1692,7 +1693,7 @@ def get_material_per_material_id_all(m_id,  ext_flag=):
         m.material_id = '%s'" % m_id)
         presults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table project from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch project data")
@@ -1701,7 +1702,7 @@ def get_material_per_material_id_all(m_id,  ext_flag=):
         where i.latest=1 and m.material_id ='%s'" % m_id)
         iresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table individual from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individual data")
@@ -1709,7 +1710,7 @@ def get_material_per_material_id_all(m_id,  ext_flag=):
         curs.execute("select distinct m.* FROM material m where m.latest=1 and m.material_id ='%s'" %m_id)
         mresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table material from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch material data")
@@ -1718,7 +1719,7 @@ def get_material_per_material_id_all(m_id,  ext_flag=):
         on m.material_id = s.material_id where s.latest=1 and m.material_id  ='%s'" % m_id)
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table sample from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch sample data")
@@ -1728,7 +1729,7 @@ def get_material_per_material_id_all(m_id,  ext_flag=):
         m.latest=1 and s.latest=1 and l.latest=1 and f.latest =1 and m.material_id ='%s'" % m_id)
         fresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table file from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch file data")
@@ -1736,15 +1737,15 @@ def get_material_per_material_id_all(m_id,  ext_flag=):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     material_results[m_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    json_results, web_results=generate_json_for_display(material_results, col_dic,  ext_flag=, "material")
-    if  ext_flag=='json':
+    json_results, web_results=generate_json_for_display(material_results, col_dic, ext_flag, "material")
+    if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="material name (material_id)= "+mresults[0][4]+" ("+str(m_id)+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['material',  0, '/web' ], results=web_results, plus=['/api/1.1/material/'+m_id+'/web','no'],db=db,  ext_flag= ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='material')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['material',  0, '/web' ], results=web_results, plus=['/api/1.1/material/'+m_id+'/web','no'],db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='material')
 
-@app.route('/api/1.1/material/< ext_flag=>', methods=['GET'])
-def get_material( ext_flag=):
+@app.route('/api/1.1/material/<ext_flag>', methods=['GET'])
+def get_material(ext_flag):
     scolumns=get_columns_from_table('material')
     columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[9]])+tuple([scolumns[12]])+scolumns[13:14]+tuple(["samples"])
     curs = mysql.connection.cursor()
@@ -1755,27 +1756,27 @@ def get_material( ext_flag=):
         m.type, m.organism_part_id")
         results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch materials")
     curs.close
     if len(results) == 0 :
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no material data available in the database '"+db+"'"})
         else:
             flash ("Error: no material data available in the database '"+db+"'")
             return redirect(url_for('index'))
     else:
-        new_columns, display_results= change_for_display([columns], list(results),  ext_flag=)
-        if  ext_flag=='json':
+        new_columns, display_results= change_for_display([columns], list(results), ext_flag)
+        if ext_flag=='json':
             json_results=tuple_to_dic(new_columns[0], display_results, "materials")
             return jsonify(webresults_to_dic(json_results))
         else:
             return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_columns[0], display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/material/all/< ext_flag=>', methods=['GET'])
-def get_material_all( ext_flag=):
+@app.route('/api/1.1/material/all/<ext_flag>', methods=['GET'])
+def get_material_all(ext_flag):
     scolumns=get_columns_from_table('material')
     columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[12]])+scolumns[5:12]+scolumns[13:]+tuple(["samples"])
     curs = mysql.connection.cursor()
@@ -1787,27 +1788,27 @@ def get_material_all( ext_flag=):
         m.type, m.volume, m.concentration, m.organism_part_id, m.changed, m.latest")
         results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch materials")
     curs.close
     if len(results) == 0 :
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no material data available in the database '"+db+"'"})
         else:
             flash ("Error: no material data available in the database '"+db+"'")
             return redirect(url_for('index'))
     else:
-        new_columns, display_results= change_for_display([columns], list(results),  ext_flag=)
-        if  ext_flag=='json':
+        new_columns, display_results= change_for_display([columns], list(results), ext_flag)
+        if ext_flag=='json':
             json_results=tuple_to_dic(new_columns[0], display_results, "materials")
             return jsonify(webresults_to_dic(json_results))
         else:
             return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_columns[0], display_results], plus=['/api/1.1/material/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/project/<p_id>/< ext_flag=>', methods=['GET'])
-def get_project_per_project_id(p_id,  ext_flag=):
+@app.route('/api/1.1/project/<p_id>/<ext_flag>', methods=['GET'])
+def get_project_per_project_id(p_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
     mcolumns=['row_id', 'material_id', 'individual_id', 'name', 'date_received', 'type', 'developmental_stage_id', 'organism_part_id', 'sample(s)']
@@ -1820,7 +1821,7 @@ def get_project_per_project_id(p_id,  ext_flag=):
         where p.project_id ='%s'" % p_id)
         presults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table project from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch project data")
@@ -1829,7 +1830,7 @@ def get_project_per_project_id(p_id,  ext_flag=):
         left join project p on a.project_id=p.project_id where i.latest=1 and p.project_id ='%s'" % p_id)
         iresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table individual from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individual data")
@@ -1842,7 +1843,7 @@ def get_project_per_project_id(p_id,  ext_flag=):
         m.developmental_stage_id, m.organism_part_id" % p_id)
         mresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table material from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch material data")
@@ -1855,7 +1856,7 @@ def get_project_per_project_id(p_id,  ext_flag=):
         s.accession, s.ssid, s.name" % p_id)
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table sample from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch sample data")
@@ -1867,7 +1868,7 @@ def get_project_per_project_id(p_id,  ext_flag=):
         left join project p on a.project_id=p.project_id where i.latest=1 and m.latest=1 and s.latest=1 and l.latest=1 and f.latest=1 and p.project_id ='%s')" % p_id)
         fresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table file from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch file data")
@@ -1875,15 +1876,15 @@ def get_project_per_project_id(p_id,  ext_flag=):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     project_results[p_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    json_results, web_results=generate_json_for_display(project_results, col_dic,  ext_flag=, "project")
-    if  ext_flag=='json':
+    json_results, web_results=generate_json_for_display(project_results, col_dic, ext_flag, "project")
+    if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="project name (project_id)= "+presults[0][1]+" ("+p_id+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/api/1.1/project/'+p_id+'/all/web','yes'], db=db,  ext_flag= ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/api/1.1/project/'+p_id+'/all/web','yes'], db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
 
-@app.route('/api/1.1/project/<p_id>/all/< ext_flag=>', methods=['GET'])
-def get_project_per_project_id_all(p_id,  ext_flag=):
+@app.route('/api/1.1/project/<p_id>/all/<ext_flag>', methods=['GET'])
+def get_project_per_project_id_all(p_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
     mcolumns=get_columns_from_table('material')+tuple(['sample(s)'])
@@ -1896,7 +1897,7 @@ def get_project_per_project_id_all(p_id,  ext_flag=):
         where p.project_id ='%s'" % p_id)
         presults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table project from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch project data")
@@ -1905,7 +1906,7 @@ def get_project_per_project_id_all(p_id,  ext_flag=):
         left join project p on a.project_id=p.project_id where i.latest=1 and p.project_id ='%s'" % p_id)
         iresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table individual from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individual data")
@@ -1916,7 +1917,7 @@ def get_project_per_project_id_all(p_id,  ext_flag=):
         group by m.row_id" % p_id)
         mresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table material from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch material data")
@@ -1926,7 +1927,7 @@ def get_project_per_project_id_all(p_id,  ext_flag=):
         left join project p on a.project_id=p.project_id where i.latest=1 and p.project_id ='%s') group by s.row_id" % p_id)
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table sample from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch sample data")
@@ -1937,7 +1938,7 @@ def get_project_per_project_id_all(p_id,  ext_flag=):
         left join project p on a.project_id=p.project_id where i.latest=1 and p.project_id ='%s')" % p_id)
         fresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to table file from database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch file data")
@@ -1945,39 +1946,40 @@ def get_project_per_project_id_all(p_id,  ext_flag=):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     project_results[p_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    json_results, web_results=generate_json_for_display(project_results, col_dic,  ext_flag=, "project")
-    if  ext_flag=='json':
+    json_results, web_results=generate_json_for_display(project_results, col_dic, ext_flag, "project")
+    if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="project name (project_id)= "+presults[0][1]+" ("+p_id+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/api/1.1/project/'+p_id+'/web','no'], log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
+        session['criteria']=for_display
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/api/1.1/project/'+p_id+'/web','no'], db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
 
-@app.route('/api/1.1/project/name/<accession>/< ext_flag=>', methods=['GET'])
-def get_project_per_accession(accession,  ext_flag=):
+@app.route('/api/1.1/project/name/<accession>/<ext_flag>', methods=['GET'])
+def get_project_per_accession(accession, ext_flag):
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT distinct project_id FROM project WHERE accession = '%s';" % accession)
         results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch items")
     curs.close()
     if len(results) == 0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no project associated with criteria provided"})
         else:
             flash ("Error: no project associated with criteria provided")
             return redirect(url_for('index'))
     else:
-        if  ext_flag=='json':
-            return get_project_per_project_id(p_id=results[0][0],  ext_flag= ext_flag)
+        if ext_flag=='json':
+            return get_project_per_project_id(p_id=results[0][0], ext_flag=ext_flag)
         else:
-            return(redirect(url_for('get_project_per_project_id', p_id=results[0][0],  ext_flag= ext_flag)))
+            return(redirect(url_for('get_project_per_project_id', p_id=results[0][0], ext_flag=ext_flag)))
 
-@app.route('/api/1.1/project/name/<accession>/individual/name/<ind_name>/< ext_flag=>', methods=['GET'])
-def get_individual_per_project_accession_and_name(accession, ind_name,  ext_flag=):
+@app.route('/api/1.1/project/name/<accession>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+def get_individual_per_project_accession_and_name(accession, ind_name, ext_flag):
     result=[]
     ind_list=ind_name.replace(" ","").replace(",", "','")
     columns=get_columns_from_table('individual')
@@ -1988,23 +1990,23 @@ def get_individual_per_project_accession_and_name(accession, ind_name,  ext_flag
         curs.execute(query)
         iresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch items")
     curs.close()
     if len(iresults) > 0:
         results="("+",".join([str(x[0]) for x in iresults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,   ext_flag= ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'project accession=' +accession+' and individual name='+ind_name:'No data available'})
         else:
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/project/name/<accession>/location/name/<location>/< ext_flag=>', methods=['GET'])
-def get_project_per_accession_and_location(accession, location,  ext_flag=):
+@app.route('/api/1.1/project/name/<accession>/location/name/<location>/<ext_flag>', methods=['GET'])
+def get_project_per_accession_and_location(accession, location, ext_flag):
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT distinct i.individual_id FROM individual i join location l on l.location_id = i.location_id \
@@ -2014,23 +2016,23 @@ def get_project_per_accession_and_location(accession, location,  ext_flag=):
         where i.latest=1 and l.location = '{reg}' and p.accession = '{acc}'". format(reg=location, acc=accession))
         presults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch location and / or project accession")
     curs.close()
     if len(presults) > 0:
         results="("+",".join([str(x[0]) for x in presults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,   ext_flag= ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'project accession=' +accession+' and location name='+location:'No data available'})
         else:
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/project/name/<accession>/sample/name/<sname>/< ext_flag=>', methods=['GET'])
-def get_samples_by_sample_name_and_project(sname, accession,  ext_flag=):
+@app.route('/api/1.1/project/name/<accession>/sample/name/<sname>/<ext_flag>', methods=['GET'])
+def get_samples_by_sample_name_and_project(sname, accession, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]
     scolumns=get_columns_from_table('sample')
@@ -2045,23 +2047,23 @@ def get_samples_by_sample_name_and_project(sname, accession,  ext_flag=):
     and p.accession='{acc}';".format(acc=accession, s_list=s_list))
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch samples with these criteria")
     curs.close()
     if len(sresults) > 0:
         results="("+",".join([str(x[0]) for x in sresults])+")"
-        return(redirect(url_for('get_sample_per_sample_id', s_id=results,   ext_flag= ext_flag)))
+        return(redirect(url_for('get_sample_per_sample_id', s_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'project accession=' +accession+' and sample name='+sname:'No data available'})
         else:
             flash ("no project associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/project/name/<accession>/species/name/<sp_name>/< ext_flag=>', methods=['GET'])
-def get_individual_per_project_accession_and_species(accession, sp_name,  ext_flag=):
+@app.route('/api/1.1/project/name/<accession>/species/name/<sp_name>/<ext_flag>', methods=['GET'])
+def get_individual_per_project_accession_and_species(accession, sp_name, ext_flag):
     results=()
     curs = mysql.connection.cursor()
     try:
@@ -2070,23 +2072,23 @@ def get_individual_per_project_accession_and_species(accession, sp_name,  ext_fl
          name like '%%{spn}%%' or common_name like '%%{spn}%%') and latest=1;". format(acc=accession, spn=sp_name))
         iresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch items")
     curs.close()
     if len(iresults) > 0:
         results="("+",".join([str(x[0]) for x in iresults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,   ext_flag= ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'project accession=' +accession+' and species name='+sp_name:'No data available'})
         else:
             flash ("no project associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/project/< ext_flag=>', methods=['GET'])
-def get_projects( ext_flag=):
+@app.route('/api/1.1/project/<ext_flag>', methods=['GET'])
+def get_projects(ext_flag):
     columns=get_columns_from_table('project')
     curs = mysql.connection.cursor()
     try:
@@ -2095,40 +2097,40 @@ def get_projects( ext_flag=):
         p.alias, p.accession, p.ssid")
         presults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch projects")
     curs.close()
     if len(presults) == 0 :
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no project data available in the database '"+db+"'"})
         else:
             flash ("Error: no project data available in the database '"+db+"'")
             return redirect(url_for('index'))
     else:
         results=[columns+tuple(['species', 'individuals']),presults]
-        if  ext_flag=='json':
+        if ext_flag=='json':
             json_results=tuple_to_dic(columns+tuple(['species', 'individuals']), presults, "projects")
             return jsonify(webresults_to_dic(json_results))
         else:
             return render_template("mysql.html", title='Query was: all projects', url_param=['project', 0, '/web'], results=results, plus=['',''], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/provider/<p_id>/< ext_flag=>', methods=['GET'])
-def get_individual_by_provider(p_id,  ext_flag=):
+@app.route('/api/1.1/provider/<p_id>/<ext_flag>', methods=['GET'])
+def get_individual_by_provider(p_id, ext_flag):
     columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT distinct i.*, p.provider_name FROM individual i right join provider p on p.provider_id=i.provider_id where i.latest=1 and p.provider_id ='%s';" % p_id)
         results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individual")
     curs.close()
     if len(results) == 0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no individual associated with criteria provided"})
         else:
             flash ("Error: no individual associated with criteria provided")
@@ -2136,10 +2138,10 @@ def get_individual_by_provider(p_id,  ext_flag=):
     else:
         list_individual_id=",".join([str(x[1]) for x in results])
         session['criteria']="provider name (provider_id)= "+results[0][-1]+" ("+str(p_id)+")"
-        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")",   ext_flag= ext_flag))
+        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
 
-@app.route('/api/1.1/provider/< ext_flag=>', methods=['GET'])
-def get_provider( ext_flag=):
+@app.route('/api/1.1/provider/<ext_flag>', methods=['GET'])
+def get_provider(ext_flag):
     pcolumns=get_columns_from_table('provider')
     columns=pcolumns[:2]+tuple([pcolumns[4]])+tuple(["species", 'individuals'])
     curs = mysql.connection.cursor()
@@ -2149,19 +2151,19 @@ def get_provider( ext_flag=):
         where p.latest=1 and i.latest=1 group by p.provider_id, p.provider_name, p.affiliation")
         results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch provider")
     curs.close()
     if len(results) == 0 :
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no provider data available in the database '"+db+"'"})
         else:
             flash ("Error: no provider data available in the database '"+db+"'")
             return redirect(url_for('index'))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             json_results=tuple_to_dic(columns, results, "providers")
             return jsonify(webresults_to_dic(json_results))
         else:
@@ -2171,8 +2173,8 @@ def get_provider( ext_flag=):
                 flash ("You need to be logged on to see contact details")
                 return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0, '/web' ], results=[columns,results], plus=['/api/1.1/provider/web','yes'], db=db, log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/provider/all/< ext_flag=>', methods=['GET'])
-def get_provider_all( ext_flag=):
+@app.route('/api/1.1/provider/all/<ext_flag>', methods=['GET'])
+def get_provider_all(ext_flag):
     pcolumns=get_columns_from_table('provider')
     columns=pcolumns+tuple(["individuals", 'species'])
     curs = mysql.connection.cursor()
@@ -2182,26 +2184,26 @@ def get_provider_all( ext_flag=):
         where p.latest=1 and i.latest=1 group by p.provider_id, p.provider_name, p.email, p.affiliation, p.address, p.phone, p.changed, p.latest")
         results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch provider")
     curs.close()
     if len(results) == 0 :
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no provider data available in the database '"+db+"'"})
         else:
             flash ("Error: no provider data available in the database '"+db+"'")
             return redirect(url_for('index'))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             json_results=tuple_to_dic(columns, results, "providers")
             return jsonify(webresults_to_dic(json_results))
         else:
             return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0 , '/web'], results=[columns,results], plus=['/api/1.1/provider/web','no'], db=db, log=1)
 
-@app.route('/api/1.1/sample/<s_id>/< ext_flag=>', methods=['GET'])
-def get_sample_per_sample_id(s_id,  ext_flag=):
+@app.route('/api/1.1/sample/<s_id>/<ext_flag>', methods=['GET'])
+def get_sample_per_sample_id(s_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
     mcolumns=['row_id', 'material_id', 'individual_id', 'name', 'date_received', 'type', 'developmental_stage_id', 'organism_part_id', 'sample(s)']
@@ -2220,7 +2222,7 @@ def get_sample_per_sample_id(s_id,  ext_flag=):
             sample s on s.material_id=m.material_id where i.latest=1 and m.latest=1 and s.latest=1 and s.sample_id = %s" % sample_id)
             presults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table project from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch project data")
@@ -2230,7 +2232,7 @@ def get_sample_per_sample_id(s_id,  ext_flag=):
             where i.latest=1 and m.latest=1 and s.sample_id and s.sample_id = %s" % sample_id)
             iresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table individual from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch individual data")
@@ -2241,7 +2243,7 @@ def get_sample_per_sample_id(s_id,  ext_flag=):
             m.developmental_stage_id, m.organism_part_id" % sample_id)
             mresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table material from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch material data")
@@ -2251,7 +2253,7 @@ def get_sample_per_sample_id(s_id,  ext_flag=):
             group by s.row_id, s.sample_id, s.material_id, s.accession, s.ssid, s.name" .format(sample_id=sample_id))
             sresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table sample from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch sample data")
@@ -2262,7 +2264,7 @@ def get_sample_per_sample_id(s_id,  ext_flag=):
             s.sample_id =l.sample_id where s.latest=1 and l.latest=1 and f.latest =1 and s.sample_id = %s" % sample_id)
             fresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table file from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch file data")
@@ -2270,15 +2272,15 @@ def get_sample_per_sample_id(s_id,  ext_flag=):
         sample_results[sample_id]=table_dic
     curs.close()
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    json_results, web_results=generate_json_for_display(sample_results, col_dic,  ext_flag=, "sample")
-    if  ext_flag=='json':
+    json_results, web_results=generate_json_for_display(sample_results, col_dic, ext_flag, "sample")
+    if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="sample name (sample_id)= "+", ".join(list_s_name)+" ("+s_id+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['sample',  0, '/web' ], results=web_results, plus=['/api/1.1/sample/'+s_id+'/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='sample')
 
-@app.route('/api/1.1/sample/<s_id>/all/< ext_flag=>', methods=['GET'])
-def get_sample_per_sample_id_all(s_id,  ext_flag=):
+@app.route('/api/1.1/sample/<s_id>/all/<ext_flag>', methods=['GET'])
+def get_sample_per_sample_id_all(s_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
     mcolumns=get_columns_from_table('material')+tuple(['sample(s)'])
@@ -2297,7 +2299,7 @@ def get_sample_per_sample_id_all(s_id,  ext_flag=):
             sample s on s.material_id=m.material_id where i.latest=1 and m.latest=1 and s.latest=1 and s.sample_id = %s" % sample_id)
             presults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table project from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch project data")
@@ -2306,7 +2308,7 @@ def get_sample_per_sample_id_all(s_id,  ext_flag=):
             join sample s on s.material_id=m.material_id where i.latest=1 and m.latest=1 and s.latest=1 and s.sample_id= %s" % sample_id)
             iresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table individual from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch individual data")
@@ -2315,7 +2317,7 @@ def get_sample_per_sample_id_all(s_id,  ext_flag=):
             on s.material_id=m.material_id where m.latest = 1 and s.latest=1 and s.sample_id = %s group by m.row_id" % sample_id)
             mresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table material from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch material data")
@@ -2325,7 +2327,7 @@ def get_sample_per_sample_id_all(s_id,  ext_flag=):
             group by s.row_id" .format(sample_id=sample_id))
             sresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table sample from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch sample data")
@@ -2335,7 +2337,7 @@ def get_sample_per_sample_id_all(s_id,  ext_flag=):
             s.sample_id =l.sample_id where l.latest=1 and f.latest =1 and s.latest=1 and s.sample_id = %s" % sample_id)
             fresults=curs.fetchall()
         except:
-            if  ext_flag=='json':
+            if ext_flag=='json':
                 return jsonify({"Connection error":"could not connect to table file from database "+db+" or unknown url parameters"})
             else:
                 flash ("Error: unable to fetch file data")
@@ -2343,41 +2345,41 @@ def get_sample_per_sample_id_all(s_id,  ext_flag=):
         sample_results[sample_id]=table_dic
     curs.close()
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    json_results, web_results=generate_json_for_display(sample_results, col_dic,  ext_flag=, "sample")
-    if  ext_flag=='json':
+    json_results, web_results=generate_json_for_display(sample_results, col_dic, ext_flag, "sample")
+    if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="sample name (sample_id)= "+", ".join(list_s_name)+" ("+s_id+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['sample',  0, '/web' ], results=web_results, plus=['/api/1.1/sample/'+s_id+'/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='sample')
 
-@app.route('/api/1.1/sample/name/<sname>/< ext_flag=>', methods=['GET'])
-def get_samples_by_name(sname,  ext_flag=):
+@app.route('/api/1.1/sample/name/<sname>/<ext_flag>', methods=['GET'])
+def get_samples_by_name(sname, ext_flag):
     s_list=sname.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT distinct sample_id FROM sample where latest=1 and name in ('{slist}') or accession in ('{slist}');".format(slist=s_list))
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch samples")
     curs.close()
     if len(sresults) == 0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no sample associated with criteria provided"})
         else:
             flash ("Error: no sample associated with criteria provided")
             return redirect(url_for('index'))
     else:
         list_sample_id=",".join([str(x[0]) for x in sresults])
-        if  ext_flag=='json':
-            return get_sample_per_sample_id(s_id=list_sample_id,  ext_flag= ext_flag)
+        if ext_flag=='json':
+            return get_sample_per_sample_id(s_id=list_sample_id, ext_flag=ext_flag)
         else:
-            return(redirect(url_for('get_sample_per_sample_id', s_id=list_sample_id,  ext_flag= ext_flag)))
+            return(redirect(url_for('get_sample_per_sample_id', s_id=list_sample_id, ext_flag=ext_flag)))
 
-@app.route('/api/1.1/sample/name/<sname>/individual/name/<ind_name>/< ext_flag=>', methods=['GET'])
-def get_samples_by_sample_name_and_individual_name(sname, ind_name,  ext_flag=):
+@app.route('/api/1.1/sample/name/<sname>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+def get_samples_by_sample_name_and_individual_name(sname, ind_name, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     ind_list=ind_name.replace(" ","").replace(",", "','")
     results=[]
@@ -2387,26 +2389,26 @@ def get_samples_by_sample_name_and_individual_name(sname, ind_name,  ext_flag=):
          or i.alias in ('{ind_list}')) and (s.accession in {s_list} or s.name in {s_list});".format(ind_list=ind_list, s_list=s_list))
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch samples with these criteria")
     curs.close()
     if len(sresults) == 0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no sample associated with criteria provided"})
         else:
             flash ("Error: no sample associated with criteria provided")
             return redirect(url_for('index'))
     else:
         list_sample_id=",".join([str(x[0]) for x in sresults])
-        if  ext_flag=='json':
-            return get_sample_per_sample_id(s_id=list_sample_id, ext_flag= ext_flag)
+        if ext_flag=='json':
+            return get_sample_per_sample_id(s_id=list_sample_id,ext_flag=ext_flag)
         else:
-            return(redirect(url_for('get_sample_per_sample_id', s_id=list_sample_id,  ext_flag= ext_flag)))
+            return(redirect(url_for('get_sample_per_sample_id', s_id=list_sample_id, ext_flag=ext_flag)))
 
-@app.route('/api/1.1/sample/< ext_flag=>', methods=['GET'])
-def get_samples( ext_flag=):
+@app.route('/api/1.1/sample/<ext_flag>', methods=['GET'])
+def get_samples(ext_flag):
     results=[]
     scolumns=get_columns_from_table('sample')
     col=tuple([scolumns[1]]+[scolumns[5]]+["individual_id"]+list(scolumns[3:4])+list(scolumns[6:]) +list(["files"]))
@@ -2419,13 +2421,13 @@ def get_samples( ext_flag=):
          s.sample_id, s.material_id, s.accession, s.ssid, s.name, s.public_name, s.changed, s.latest")
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch samples")
     if len(sresults) == 0:
         curs.close()
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no sample data available in the database '"+db+"'"})
         else:
             flash ("Error: no sample data available in the database '"+db+"'")
@@ -2436,22 +2438,22 @@ def get_samples( ext_flag=):
                 curs.execute("SELECT distinct i.individual_id from material m join individual i on i.individual_id=m.individual_id where m.material_id = '%s' ;" % row[1])
                 id_return=curs.fetchall()
             except:
-                if  ext_flag=='json':
+                if ext_flag=='json':
                     return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
                 else:
                     flash ("Error: unable to fetch items")
             id_results=[row[0]]+[row[4]]+[id_return[0][0]]+list(row[2:3])+list(row[5:])
             results.append(tuple(id_results))
         curs.close()
-        new_columns, display_results= change_for_display([columns], results,  ext_flag=)
-        if  ext_flag=='json':
+        new_columns, display_results= change_for_display([columns], results, ext_flag)
+        if ext_flag=='json':
             json_results=tuple_to_dic(tuple(new_columns[0]), display_results, "samples")
             return jsonify(webresults_to_dic(json_results))
         else:
             return render_template("mysql.html", title='Query was: all samples', url_param=['sample', 0, '/web'], results=[new_columns[0],display_results], plus=['',''], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/species/<sp_id>/< ext_flag=>', methods=['GET'])
-def get_species_per_species_id(sp_id,  ext_flag=):
+@app.route('/api/1.1/species/<sp_id>/<ext_flag>', methods=['GET'])
+def get_species_per_species_id(sp_id, ext_flag):
     columns=get_columns_from_table('individual')[1:8]
     results=[]
     curs = mysql.connection.cursor()
@@ -2460,14 +2462,14 @@ def get_species_per_species_id(sp_id,  ext_flag=):
         s.species_id=i.species_id where i.latest=1 and i.species_id = %s;" % sp_id)
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch individuals")
             return redirect(url_for('index'))
     curs.close
     if len(sresults) == 0:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no species associated with criteria provided"})
         else:
             flash ("Error: no species associated with criteria provided")
@@ -2475,10 +2477,10 @@ def get_species_per_species_id(sp_id,  ext_flag=):
     else:
         list_individual_id=", ".join([str(x[0]) for x in sresults])
         session['criteria']="species name (species_id)= "+sresults[0][-1]+" ("+str(sp_id)+")"
-        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")",  ext_flag= ext_flag))
+        return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
 
-@app.route('/api/1.1/species/< ext_flag=>', methods=['GET'])
-def get_species( ext_flag=):
+@app.route('/api/1.1/species/<ext_flag>', methods=['GET'])
+def get_species(ext_flag):
     scolumns=get_columns_from_table('species')
     columns=scolumns[1:6]+tuple([scolumns[9]])+tuple(["individuals"])
     curs = mysql.connection.cursor()
@@ -2488,28 +2490,28 @@ def get_species( ext_flag=):
         s.taxon_id, s.common_name, s.taxon_position")
         results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch species")
             return redirect(url_for('index'))
     curs.close()
     if len(results) == 0 :
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no species data available in the database '"+db+"'"})
         else:
             flash ("Error: no species data available in the database '"+db+"'")
             return redirect(url_for('index'))
     else:
-        new_columns, display_results= change_for_display(list([columns]), list(results),  ext_flag=)
-        if  ext_flag=='json':
+        new_columns, display_results= change_for_display(list([columns]), list(results), ext_flag)
+        if ext_flag=='json':
             json_results=tuple_to_dic(tuple(new_columns[0]), display_results, "species")
             return jsonify(webresults_to_dic(json_results))
         else:
             return render_template("mysql.html", title='Query was: all species', url_param=['species',0, '/web'], results=[new_columns[0], display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/species/all/< ext_flag=>', methods=['GET'])
-def get_species_all( ext_flag=):
+@app.route('/api/1.1/species/all/<ext_flag>', methods=['GET'])
+def get_species_all(ext_flag):
     scolumns=get_columns_from_table('species')
     columns=scolumns[1:]+tuple(["individuals"])
     curs = mysql.connection.cursor()
@@ -2521,28 +2523,28 @@ def get_species_all( ext_flag=):
         s.karyotype, s.ploidy, s.family_id, s.taxon_position, s.genome_size, s.iucn, s.changed, s.latest")
         results=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch species")
             return redirect(url_for('index'))
     curs.close()
     if len(results) == 0 :
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Data error":"no species data available in the database '"+db+"'"})
         else:
             flash ("Error: no species data available in the database '"+db+"'")
             return redirect(url_for('index'))
     else:
-        new_columns, display_results= change_for_display(list([columns]), list(results),  ext_flag=)
-        if  ext_flag=='json':
+        new_columns, display_results= change_for_display(list([columns]), list(results), ext_flag)
+        if ext_flag=='json':
             json_results=tuple_to_dic(tuple(new_columns[0]), display_results, "species")
             return jsonify(webresults_to_dic(json_results))
         else:
             return render_template("mysql.html", title='Query was: all species', url_param=['species',0, '/web'], results=[new_columns[0], display_results], plus=['/api/1.1/species/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/species/name/<sp_name>/< ext_flag=>', methods=['GET'])
-def get_species_per_name(sp_name,  ext_flag=):
+@app.route('/api/1.1/species/name/<sp_name>/<ext_flag>', methods=['GET'])
+def get_species_per_name(sp_name, ext_flag):
     list_species_id=""
     scolumns=get_columns_from_table('species')
     columns=scolumns[1:6]+scolumns[9:]+tuple(["individuals"])
@@ -2552,7 +2554,7 @@ def get_species_per_name(sp_name,  ext_flag=):
         and (s.name like '%{spn}%' or s.common_name like '%{spn}%')".format(spn=sp_name))
         spresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch species")
@@ -2561,39 +2563,39 @@ def get_species_per_name(sp_name,  ext_flag=):
     if len(spresults) > 0:
         results="("+",".join([str(x[0]) for x in spresults])+")"
         session['criteria']='species name (species_id)='+sp_name +" ("+str(spresults[0][-1])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,   ext_flag= ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'species_name='+sp_name:'No data available'})
         else:
             flash ("no species associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/species/name/<sp_name>/individual/name/<ind_name>/< ext_flag=>', methods=['GET'])
-def get_individual_per_name_and_species_name(ind_name, sp_name,  ext_flag=):
+@app.route('/api/1.1/species/name/<sp_name>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+def get_individual_per_name_and_species_name(ind_name, sp_name, ext_flag):
     ind_list=ind_name.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT distinct i.individual_id FROM individual i join species s on i.species_id=s.species_id WHERE i.latest=1 and (s.name like '%%{spn}%%' or s.common_name like '%%{spn}%%') and (i.name in ('{i_l}') or i.alias in ('{i_l}'));". format(spn=sp_name, i_l=ind_list))
         iresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch items")
     curs.close()
     if len(iresults) > 0:
         results="("+",".join([str(x[0]) for x in iresults])+")"
-        return(redirect(url_for('get_individual_per_individual_id', i_id=results,  ext_flag= ext_flag)))
+        return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'species name=' +sp_name+' and individual name='+ind_name:'No data available'})
         else:
             flash ("no species associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/species/name/<sp_name>/sample/name/<sname>/< ext_flag=>', methods=['GET'])
-def get_samples_by_sample_name_and_species(sname, sp_name,  ext_flag=):
+@app.route('/api/1.1/species/name/<sp_name>/sample/name/<sname>/<ext_flag>', methods=['GET'])
+def get_samples_by_sample_name_and_species(sname, sp_name, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]
     scolumns=get_columns_from_table('sample')
@@ -2607,16 +2609,16 @@ def get_samples_by_sample_name_and_species(sname, sp_name,  ext_flag=):
         and (s.accession in {s_list} or s.name in {s_list}) and (sp.name like '%{spn}%' or sp.common_name like '%{spn}%');".format(spn=sp_name, s_list=s_list))
         sresults=curs.fetchall()
     except:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
             flash ("Error: unable to fetch samples with these criteria")
     curs.close()
     if len(sresults) > 0:
         results="("+",".join([str(x[0]) for x in sresults])+")"
-        return(redirect(url_for('get_sample_per_sample_id', s_id=results,  ext_flag= ext_flag)))
+        return(redirect(url_for('get_sample_per_sample_id', s_id=results, ext_flag=ext_flag)))
     else:
-        if  ext_flag=='json':
+        if ext_flag=='json':
             return jsonify({'species name=' +sp_name+' and sample name='+sname:'No data available'})
         else:
             flash ("no sample associated with the criteria provided")
