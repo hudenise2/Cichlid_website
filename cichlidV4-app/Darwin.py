@@ -229,6 +229,8 @@ def change_for_display(col, data, ext_flag):
                 for idx in range(1,2):
                     row.insert(column.index('species_name')+idx, '')
             else:
+                print(row)
+                print(column)
                 for idx in range(1,2):
                     row.insert(column.index('species_name')+idx, str(row[column.index('species_name')][idx]))
                 row[column.index('species_name')]= str(row[column.index('species_name')][0])
@@ -1949,6 +1951,7 @@ def get_project_per_project_id_all(p_id, ext_flag):
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="project name (project_id)= "+presults[0][1]+" ("+p_id+")"
+        session['criteria']=for_display
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/api/1.1/project/'+p_id+'/web','no'], log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
 
 @app.route('/api/1.1/project/name/<accession>/<ext_flag>', methods=['GET'])
