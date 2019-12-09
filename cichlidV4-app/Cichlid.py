@@ -1255,11 +1255,12 @@ def get_individual_per_individual_name(ind_name, ext_flag):
         else:
             flash ("Error: unable to fetch individuals")
     curs.close()
-    if len(i_results)==0:
+    if len(i_results)== 0:
         if ext_flag=='json':
             return jsonify({"Data error":"no individual associated with criteria provided"})
         else:
             flash ("Error: no individual associated with criteria provided")
+            return redirect(url_for('index'))
     else:
         for row in i_results:
             results+=","+str(row[0])
