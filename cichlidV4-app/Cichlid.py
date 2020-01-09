@@ -1026,7 +1026,7 @@ def get_image_per_image_id(im_id, ext_flag):
             flash ("Error: no individual associated with criteria provided")
     else:
         if img_results[0][0] is None:
-            flash ("There is no individual associated with this image")
+            flash ("There was no individual associated with this image")
             return redirect(url_for('get_images', ext_flag=ext_flag))
         else:
             session['criteria']="image name (image_id)= "+str(img_results[0][-1]) +" ("+str(im_id)+")"
