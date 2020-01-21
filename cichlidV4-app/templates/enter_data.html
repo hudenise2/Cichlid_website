@@ -60,14 +60,14 @@
 
       <div style = font-size:16px; font-weight:bold;>
         <p>
-            {{ form.ind_name.label }}
+            {{ form.ind_name.label }}&nbsp;
             {{ form.ind_name(size=32) }}<br>
         </p>
         <p>
-            {{ form.ind_alias.label }}
+            {{ form.ind_alias.label }}&nbsp;
             {{ form.ind_alias(size=32) }}<br>
         </p>
-          {{ form.Gender.label }} {{ form.Gender }}
+          {{ form.Gender.label }} {{ form.Gender }}&nbsp;
           {{ form.dev_stage.label }} {{ form.dev_stage}}<br>
       </div>
 
@@ -99,7 +99,7 @@
         {% for prov in prov_list %}
           <option value= "{{prov}}" SELECTED>{{prov}}</option>"
         {% endfor %}
-      </select>
+      </select>&nbsp;&nbsp;or fill this form:
       </p>
       <p>
       {{ form.pv_name.label }}{{ form.pv_name(size=32) }}<br>
@@ -121,9 +121,7 @@
       <div class="option-content is-hidden">
       <div style = font-size:16px; font-weight:bold;>
         <p>
-          {{ form.mat_name.label }}{{ form.mat_name(size=32) }}<br>
-        </p>
-        <p>
+          {{ form.mat_name.label }}{{ form.mat_name(size=32) }}&nbsp;
           {{ form.mat_acc.label }}{{ form.mat_acc(size=32) }}<br>
         </p>
         <p>
@@ -137,15 +135,21 @@
             </p>
         </p>
         <p>
-            {{ form.mat_location.label }}{{ form.mat_location}}
+            {{ form.mat_location.label }}{{ form.mat_location}}&nbsp;
             {{ form.mat_loc_pos.label }}{{ form.mat_loc_pos}}<br>
           </p>
         <p>
-          {{ form.mat_wgt.label }}{{ form.mat_wgt(size=10) }}{{ form.mat_unit.label }}{{ form.mat_unit}}<br>
+          {{ form.mat_wgt.label }}{{ form.mat_wgt(size=10) }}&nbsp;
+          {{ form.mat_unit.label }}{{ form.mat_unit}}<br>
         </p>
-        <p>{{ form.mat_received.label }}{{ form.mat_received(size=16) }}<br>
+        <p>{{ form.mat_received.label }}{{ form.mat_received(size=16) }}&nbsp;&nbsp;
+          <select name= provname method="GET" action="/">
+            {% for prov in prov_list %}
+              <option value= "{{prov}}" SELECTED>{{prov}}</option>"
+            {% endfor %}
+          </select><br>
         </p>
-
+        <p>{{ form.mat_comment.label }}{{ form.mat_comment(size=16) }}<br>
       </div>
     </div>
     </fieldset>
@@ -155,21 +159,30 @@
       <div class="option-content is-hidden">
       <div style = font-size:16px; font-weight:bold;>
         <p>
-          {{ form.loc_region.label }}{{ form.loc_region(size=32) }}<br>
+          {{ form.loc_country.label }}{{ form.loc_country(size=32) }}<br>
         </p>
         <p>
+          {{ form.loc_region.label }}{{ form.loc_region(size=32) }}&nbsp;
           {{ form.loc_details.label }}{{ form.loc_details(size=32) }}<br>
         </p>
         <p>
-          {{ form.loc_lat.label }}{{ form.loc_lat(size=10) }}<br>
+          {{ form.loc_lat.label }}{{ form.loc_lat(size=10) }}&nbsp;
+          {{ form.loc_lng.label }}{{ form.loc_lng(size=10) }}<br><br>
         </p>
         <p>
-          {{ form.loc_lng.label }}{{ form.loc_lng(size=10) }}<br>
+          {{ form.loc_method.label }}{{ form.loc_method(size=32) }}&nbsp;
+          {{ form.loc_details.label }}{{ form.loc_details(size=32) }}<br>
         </p>
         <p>
-          {{ form.loc_method.label }}{{ form.loc_method(size=32) }}<br>
+          {{ form.loc_weight.label }}{{ form.loc_weight(size=32) }}&nbsp;
+          {{ form.loc_unit.label }}{{ form.loc_unit }}<br>
         </p>
-    <p>{{ form.loc_collected.label }}{{ form.loc_collected(size=16) }}<br>
+    <p>{{ form.loc_collected.label }}{{ form.loc_collected(size=16) }}&nbsp;&nbsp;
+      <select name= provname method="GET" action="/">
+        {% for prov in prov_list %}
+          <option value= "{{prov}}" SELECTED>{{prov}}</option>"
+        {% endfor %}
+      </select><br>
     </p>
   </div>
         </fieldset>
@@ -185,12 +198,55 @@
               {{ form.prj_alias.label }}{{ form.prj_alias(size=32) }}<br>
             </p>
             <p>
-              {{ form.prj_acc.label }}{{ form.prj_acc(size=16) }}<br>
-            </p>
-            <p>
+              {{ form.prj_acc.label }}{{ form.prj_acc(size=16) }}&nbsp;
               {{ form.prj_ssid.label }}{{ form.prj_ssid(size=10) }}<br>
             </p>
           </fieldset>
+          <p></p>
+          <fieldset>
+            <div class="option-heading"><b> Sequencing</b> information </div>
+            <div class="option-content is-hidden">
+            <div style = font-size:16px; font-weight:bold;>
+              <p>
+                {{ form.spl_name.label }}{{ form.spl_name(size=32) }}<br>
+              </p>
+              <p>
+                {{ form.spl_accession.label }}{{ form.spl_accession(size=10) }}&nbsp;
+                {{ form.spl_ssid.label }}{{ form.spl_ssid(size=10) }}<br>
+              </p>
+              <p>
+                {{ form.spl_comment.label }}{{ form.spl_comment(size=32) }}<br><br>
+              </p>
+              <p>
+                {{ form.lane_name.label }}{{ form.lane_name(size=32) }}&nbsp;
+                {{ form.lane_accession.label }}{{ form.lane_accession(size=10) }}<br><br>
+
+                {{ form.lib_name.label }}{{ form.lib_name(size=32) }}&nbsp;
+                {{ form.lib_ssid.label }}{{ form.lib_ssid(size=10) }}<br><br>
+              </p>
+              <p>
+                {{ form.file_name.label }}{{ form.file_name(size=32) }}&nbsp;
+                {{ form.file_accession.label }}{{ form.file_accession(size=10) }}<br>
+              </p>
+              <p>
+                {{ form.file_format.label }}{{ form.file_format }}&nbsp;
+                {{ form.file_PE.label }}{{ form.file_PE}}&nbsp;&nbsp;
+                {{ form.file_reads.label }}{{ form.file_reads(size=20)}}<br>
+              </p>
+              <p>
+                {{ form.file_md5.label }}{{ form.file_md5(size=40) }}&nbsp;
+                {{ form.file_path.label }}{{ form.file_path(size=60) }}<br>
+              </p>
+              <p>
+                {{ form.file_comment.label }}{{ form.file_comment(size=32) }}<br>
+              </p>
+              <p></p>
+              <p>
+                {{ form.seq_tech.label }}{{ form.seq_tech }}&nbsp;
+                {{ form.seq_centre.label }}{{ form.seq_centre(size=32) }}<br>
+              </p>
+        </div>
+              </fieldset>
         <p></p>
         <fieldset>
           <div class="option-heading"><b> Image</b> information </div>
@@ -203,13 +259,14 @@
               {{ form.img_source.label }}{{ form.img_source(size=32) }}<br>
             </p>
             <p>
-              {{ form.img_comments.label }}{{ form.img_comments(size=32) }}<br>
+              {{ form.img_comments.label }}{{ form.img_comments(size=32) }}&nbsp;
+              {{ form.img_licence.label }}{{ form.img_licence(size=32) }}<br>
             </p>
       </div>
     </fieldset>
     <p></p>
     <fieldset>
-      <div class="option-heading"><b> Other annotations</b> </div>
+      <div class="option-heading"><b> Other comments</b> </div>
       <div class="option-content is-hidden">
       <div style = font-size:16px; font-weight:bold;>
         <p>
