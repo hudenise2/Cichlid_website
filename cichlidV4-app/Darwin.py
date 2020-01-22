@@ -7,8 +7,8 @@ from flask_login import UserMixin, login_user, logout_user, current_user, login_
 from wtforms import Form, BooleanField, TextField, PasswordField, validators
 import hashlib
 from MySQLdb import escape_string as thwart
-import gc, json
-import os, binascii
+import gc, json, time
+import os, glob, binascii
 from flask_mail import Message, Mail
 from forms import LoginForm, RegistrationForm, EntryForm, EnterDataForm, DatabaseForm
 from config import Config
@@ -16,7 +16,7 @@ app = Flask(__name__)
 
 '''
     Website script written by H. Denise (Cambridge Uni) 27/11/2019
-    Script for the Cichlid database
+    Script for the Darwin/VGP database
 '''
 #initialisation of connection
 config_file_path=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))+'/config/Darwin_dbV1.json'
@@ -43,6 +43,7 @@ mail.init_app(app)
 session={}
 session['logged_in']=0
 db='darwin'
+today=time.strftime("%Y-%m-%d")
 ################### DATA PROCESSING FUNCTIONS ##################################
 def add_individual_data_info(col, data):
     """adding individual_data information if available to 'individual' display"""
@@ -229,8 +230,6 @@ def change_for_display(col, data, ext_flag):
                 for idx in range(1,2):
                     row.insert(column.index('species_name')+idx, '')
             else:
-                print(row)
-                print(column)
                 for idx in range(1,2):
                     row.insert(column.index('species_name')+idx, str(row[column.index('species_name')][idx]))
                 row[column.index('species_name')]= str(row[column.index('species_name')][0])
@@ -264,13 +263,17 @@ def change_for_display(col, data, ext_flag):
             curs.execute("SELECT filepath, filename FROM image WHERE individual_id= '{id}';". format(id=row[0]))
             image_results=curs.fetchall()
             curs.close()
-            if image_results:
-                #create path to image file
-                row.append("/".join(list(image_results[0])))
-            else:
-                row.append('')
             if 'thumbnail' not in column:
                 column.append('thumbnail')
+            if image_results and 'samples' not in column:
+                for image_index in range(0, len(image_results)):
+                    #create path to image file
+                    row.append("/".join(list(image_results[image_index])))
+                    #required to match column and data length
+                    if image_index > 0:
+                        column.append('thumbnail')
+            else:
+                row.append('')
         #get the updated columns and data in a list
         list_new_data.append(row)
         list_new_columns.append(column)
@@ -278,6 +281,18 @@ def change_for_display(col, data, ext_flag):
         if column[0]=='individual_id' and len(column) > 13:
             list_new_data = reorder_for_vertical_display(list_new_data)
     return tuple(list_new_columns), tuple(list_new_data)
+
+def ensure_thumbnails_display(results):
+    '''add empty data field to match the column length'''
+    '''
+    input results: dictionary of reformatted data to display with table as key and column and table data  as value (dic) (see generate_json_for_display)
+    return results: same dictionary with length of individual data identical to length of individual column
+    '''
+    col_length=len(results['individual']['column'])
+    for entry_index in range(0, len(results['individual']['data'])):
+        if len(results['individual']['data'][entry_index]) < col_length:
+            results['individual']['data'][entry_index]=results['individual']['data'][entry_index]+(col_length-len(results['individual']['data'][entry_index]))*[""]
+    return results
 
 def generate_json_for_display(res_dic, col_dic, ext_flag, identifier):
     '''reformat data as json for the web display and also to download as json '''
@@ -326,10 +341,16 @@ def generate_json_for_display(res_dic, col_dic, ext_flag, identifier):
                         web_results[table]['column']=col[table_name.index(table)]
                     elif not 'no data available for this table' in new_data[0]:
                         web_results[table]['data']=previous_data+new_data
+                        #ensure appropriate display when more than 1 thumbnail is present
+                        old_col_length=len(web_results[table]['column'])
+                        new_col_length=len(col[table_name.index(table)])
+                        if new_col_length > old_col_length:
+                            web_results[table]['column']=col[table_name.index(table)]
             else:
                 web_results[table]={'column':col[table_name.index(table)], 'data':res[table_name.index(table)]}
             json_results[identifier+":"+str(id)][table]={'column':tuple(col[table_name.index(table)]), 'data':tuple(res[table_name.index(table)])}
-    return json_results, web_results
+    complete_web_results=ensure_thumbnails_display(web_results)
+    return json_results, complete_web_results
 
 def get_columns_from_table(table_name):
     """extract the name of fields for a given table extracted from the information schema of the database"""
@@ -646,7 +667,6 @@ def index():
         elif flag == 'AS':
                 return redirect(url_for(url_dic[flag], accession=arg_dic[flag][0], sp_name=arg_dic[flag][1],  ext_flag=ext_flag))
         elif flag=='I':
-
             return redirect(url_for(url_dic[flag], ind_name= individual_name,  ext_flag=ext_flag))
         elif flag=='IS':
             return redirect(url_for(url_dic[flag], ind_name= individual_name, sp_name=arg_dic[flag][1],  ext_flag=ext_flag))
@@ -657,7 +677,6 @@ def index():
         elif flag =='SL':
             return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], sp_name=arg_dic[flag][0],  ext_flag=ext_flag))
         elif flag =='IL':
-
             return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], ind_name=arg_dic[flag][0],  ext_flag=ext_flag))
         elif flag =='AL':
             return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], accession=arg_dic[flag][0],  ext_flag=ext_flag))
@@ -696,11 +715,13 @@ def enter_data():
         else:
             flash ("Error: unable to fetch provider names")
     curs.close()
+    provider_list.append("-choose providers-")
     for prov in provider_res:
         provider_list.append(prov[0])
-    provider_list.append("-current providers-")
+    #provider_list.append("-choose providers-")
     if request.method == "POST" and form.validate():
         results=request.form
+        session['usrname']=usrname
         if 'Download' in results:
             return redirect(url_for('download'))
         elif 'Upload' in results:
@@ -792,19 +813,33 @@ def register():
 @app.route('/api/1.1/download', methods=['GET', 'POST'])
 def download():
     """function to provide the csv template to enter data"""
-    return send_file("entry.csv",
-        mimetype="text/csv",
-        attachment_filename='entry.csv',
+    return send_file("entry.tsv",
+        mimetype="text/tsv",
+        attachment_filename='entry.tsv',
                      as_attachment=True)
 
 @app.route('/api/1.1/upload/<file>', methods=['GET', 'POST'])
 def upload(file):
     """function to reupload the filled csv template to add, update or overwrite the database"""
     f = open(file, 'r')
+    usrname=session.get('usrname', None)
+    suffix=""
     #only keep lines with data
-    File = [line.rstrip('\n') for line in f if len(line.split(",")[0]) > 0]
+    File = [line for line in f if len(line.split(",")[0]) > 0]
+    #check if file already exists for today to ensure to not overwrite if multiple upload on the same day by same submitter
+    dir_content=glob.glob("upload_"+today+"*.tsv")
+    if len(dir_content) > 0:
+        existing_suffixes=[file.split("_")[2] for file in dir_content if len(file.split("_"))==4]
+        if len(existing_suffixes) > 0:
+            suffix="_"+str(int(max(existing_suffixes))+1)
+        else:
+            suffix="_1"
     flash ('file uploaded successfully')
-    return redirect(url_for('index'))
+    #save File as a tab-separated file
+    with open("upload_"+today+suffix+"_"+usrname+".tsv", "w") as File_output:
+        for line in File:
+            File_output.write(line)
+    return redirect(url_for('enter_data'))
 
 @app.route('/api/1.1/info', methods=['GET', 'POST'])
 def info():
@@ -1005,18 +1040,22 @@ def get_image_per_image_id(im_id, ext_flag):
         else:
             flash ("Error: no individual associated with criteria provided")
     else:
-        session['criteria']="image name (image_id)= "+str(img_results[0][-1]) +" ("+str(im_id)+")"
-        return redirect(url_for('get_individual_per_individual_id', i_id="("+str(img_results[0][0])+")", ext_flag=ext_flag))
+        if img_results[0][0] is None:
+            flash ("There was no individual associated with this image")
+            return redirect(url_for('get_images', ext_flag=ext_flag))
+        else:
+            session['criteria']="image name (image_id)= "+str(img_results[0][-1]) +" ("+str(im_id)+")"
+            return redirect(url_for('get_individual_per_individual_id', i_id="("+str(img_results[0][0])+")", ext_flag=ext_flag))
 
 @app.route('/api/1.1/image/<ext_flag>', methods=['GET'])
 def get_images(ext_flag):
     results=[]
     columns=get_columns_from_table('image')
-    col=[columns[0]]+[columns[2]]+[columns[1]]+['thumbnail']+[columns[4]]
+    col=[columns[0]]+[columns[1]]+[columns[2]]+['thumbnail']+[columns[4]]
     columns=tuple(col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM image where latest=1")
+        curs.execute("SELECT i.* FROM image i left join individual ind on i.individual_id=ind.individual_id where i.latest=1 order by i.individual_id")
         img_results=curs.fetchall()
     except:
         if ext_flag=='json':
@@ -1024,14 +1063,14 @@ def get_images(ext_flag):
         else:
             flash ("Error: unable to fetch images")
     curs.close()
-    if len(img_results) ==0:
+    if len(img_results) == 0:
         if ext_flag=='json':
             return jsonify({"Data error":"no image data available in the database '"+db+"'"})
         else:
             flash ("Error: no image data available in the database '"+db+"'")
             return redirect(url_for('index'))
     for row in img_results:
-        i_results=[row[0]]+[row[2]]+[row[1]]+list([row[3]+"/"+row[2]])+[row[4]]
+        i_results=[row[0]]+[row[1]]+[row[2]]+list([row[3]+"/"+row[2]])+[row[4]]
         results.append(tuple(i_results))
     new_column, display_results= change_for_display([columns], results, ext_flag)
     if ext_flag=='json':
@@ -1039,17 +1078,17 @@ def get_images(ext_flag):
         return jsonify(webresults_to_dic(json_results))
     else:
         #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed)crumbs (to display navigation history))
-        return render_template("mysql.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+        return render_template("image2.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
 @app.route('/api/1.1/image/all/<ext_flag>', methods=['GET'])
 def get_images_all(ext_flag):
     results=[]
     columns=get_columns_from_table('image')
-    col=[columns[0]]+[columns[2]]+[columns[1]]+['thumbnail']+list(columns[3:])
+    col=[columns[0]]+[columns[1]]+[columns[2]]+['thumbnail']+list(columns[3:])
     columns=tuple(col)
     curs = mysql.connection.cursor()
     try:
-        curs.execute("SELECT * FROM image where latest=1")
+        curs.execute("SELECT i.* FROM image i left join individual ind on i.individual_id=ind.individual_id where i.latest=1 order by i.individual_id")
         img_results=curs.fetchall()
     except:
         if ext_flag=='json':
@@ -1065,7 +1104,7 @@ def get_images_all(ext_flag):
             return redirect(url_for('index'))
     else:
         for row in img_results:
-            i_results=[row[0]]+[row[2]]+[row[1]]+list([row[3]+"/"+row[2]])+list(row[3:])
+            i_results=[row[0]]+[row[1]]+[row[2]]+list([row[3]+"/"+row[2]])+list(row[3:])
             results.append(tuple(i_results))
         new_column, display_results= change_for_display([columns], results, ext_flag)
         if ext_flag=='json':
@@ -1073,7 +1112,7 @@ def get_images_all(ext_flag):
             return jsonify(webresults_to_dic(json_results))
         else:
             #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
-            return render_template("mysql.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['/api/1.1/image/web', 'no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+            return render_template("image2.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['/api/1.1/image/web', 'no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
 @app.route('/api/1.1/individual/<i_id>/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_id(i_id, ext_flag):
@@ -1255,14 +1294,16 @@ def get_individual_per_individual_name(ind_name, ext_flag):
         else:
             flash ("Error: unable to fetch individuals")
     curs.close()
-    if len(i_results)==0:
+    if len(i_results)== 0:
         if ext_flag=='json':
             return jsonify({"Data error":"no individual associated with criteria provided"})
         else:
             flash ("Error: no individual associated with criteria provided")
+            return redirect(url_for('index'))
     else:
         for row in i_results:
-            results+=","+str(row[0])
+            if str(row[0]) not in results:
+                results+=","+str(row[0])
         if ext_flag=='json':
             return get_individual_per_individual_id(i_id=results[1:], ext_flag=ext_flag)
         else:
