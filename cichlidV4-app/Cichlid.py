@@ -7,8 +7,8 @@ from flask_login import UserMixin, login_user, logout_user, current_user, login_
 from wtforms import Form, BooleanField, TextField, PasswordField, validators
 import hashlib
 from MySQLdb import escape_string as thwart
-import gc, json
-import os, binascii
+import gc, json, time
+import os, glob, binascii
 from flask_mail import Message, Mail
 from forms import LoginForm, RegistrationForm, EntryForm, EnterDataForm, DatabaseForm
 from config import Config
@@ -43,6 +43,7 @@ mail.init_app(app)
 session={}
 session['logged_in']=0
 db='cichlid'
+today=time.strftime("%Y-%m-%d")
 ################### DATA PROCESSING FUNCTIONS ##################################
 def add_individual_data_info(col, data):
     """adding individual_data information if available to 'individual' display"""
@@ -666,7 +667,6 @@ def index():
         elif flag == 'AS':
                 return redirect(url_for(url_dic[flag], accession=arg_dic[flag][0], sp_name=arg_dic[flag][1],  ext_flag=ext_flag))
         elif flag=='I':
-
             return redirect(url_for(url_dic[flag], ind_name= individual_name,  ext_flag=ext_flag))
         elif flag=='IS':
             return redirect(url_for(url_dic[flag], ind_name= individual_name, sp_name=arg_dic[flag][1],  ext_flag=ext_flag))
@@ -677,7 +677,6 @@ def index():
         elif flag =='SL':
             return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], sp_name=arg_dic[flag][0],  ext_flag=ext_flag))
         elif flag =='IL':
-
             return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], ind_name=arg_dic[flag][0],  ext_flag=ext_flag))
         elif flag =='AL':
             return redirect(url_for(url_dic[flag], location=arg_dic[flag][1], accession=arg_dic[flag][0],  ext_flag=ext_flag))
@@ -716,11 +715,13 @@ def enter_data():
         else:
             flash ("Error: unable to fetch provider names")
     curs.close()
+    provider_list.append("-choose providers-")
     for prov in provider_res:
         provider_list.append(prov[0])
-    provider_list.append("-current providers-")
+    #provider_list.append("-choose providers-")
     if request.method == "POST" and form.validate():
         results=request.form
+        session['usrname']=usrname
         if 'Download' in results:
             return redirect(url_for('download'))
         elif 'Upload' in results:
@@ -812,19 +813,33 @@ def register():
 @app.route('/api/1.1/download', methods=['GET', 'POST'])
 def download():
     """function to provide the csv template to enter data"""
-    return send_file("entry.csv",
-        mimetype="text/csv",
-        attachment_filename='entry.csv',
+    return send_file("entry.tsv",
+        mimetype="text/tsv",
+        attachment_filename='entry.tsv',
                      as_attachment=True)
 
 @app.route('/api/1.1/upload/<file>', methods=['GET', 'POST'])
 def upload(file):
     """function to reupload the filled csv template to add, update or overwrite the database"""
     f = open(file, 'r')
+    usrname=session.get('usrname', None)
+    suffix=""
     #only keep lines with data
-    File = [line.rstrip('\n') for line in f if len(line.split(",")[0]) > 0]
+    File = [line for line in f if len(line.split(",")[0]) > 0]
+    #check if file already exists for today to ensure to not overwrite if multiple upload on the same day by same submitter
+    dir_content=glob.glob("upload_"+today+"*.tsv")
+    if len(dir_content) > 0:
+        existing_suffixes=[file.split("_")[2] for file in dir_content if len(file.split("_"))==4]
+        if len(existing_suffixes) > 0:
+            suffix="_"+str(int(max(existing_suffixes))+1)
+        else:
+            suffix="_1"
     flash ('file uploaded successfully')
-    return redirect(url_for('index'))
+    #save File as a tab-separated file
+    with open("upload_"+today+suffix+"_"+usrname+".tsv", "w") as File_output:
+        for line in File:
+            File_output.write(line)
+    return redirect(url_for('enter_data'))
 
 @app.route('/api/1.1/info', methods=['GET', 'POST'])
 def info():
