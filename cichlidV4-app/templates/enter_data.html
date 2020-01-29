@@ -25,7 +25,10 @@
     padding: 0;
     width: 0%;
     box-sizing:border-box;
-}
+    }
+    .error {
+      color: red
+    }
     </style>
 
 
@@ -39,9 +42,8 @@
           <a style="font-size:120%;">{{usrname}}</a>
       </h3>
     </div>
-  </head>
+</head>
 <body>
-
     <form action="{{ url_for('enter_data') }}" method="post">
       {{ form.hidden_tag() }}
       <h3 style="text-align:center;font-weight:500;line-height:1.2; font-family:-apple-system; margin-top:0;font-size:2.5rem;color:#007bff;">ENTER DATA data into the {{db}} database:<p style="margin-left: 40px"></h3><h3>     you can download a template
@@ -142,7 +144,7 @@
           {{ form.mat_wgt.label }}{{ form.mat_wgt(size=10) }}&nbsp;
           {{ form.mat_unit.label }}{{ form.mat_unit}}<br>
         </p>
-        <p>{{ form.mat_received.label }}{{ form.mat_received(size=16) }}&nbsp;&nbsp;
+        <p>{{ form.mat_received.label }}{{ form.mat_received(size=16) }}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Provider:&nbsp;
           <select name= provname method="GET" action="/">
             {% for prov in prov_list %}
               <option value= "{{prov}}" SELECTED>{{prov}}</option>"
@@ -174,10 +176,10 @@
           {{ form.loc_details.label }}{{ form.loc_details(size=32) }}<br>
         </p>
         <p>
-          {{ form.loc_weight.label }}{{ form.loc_weight(size=32) }}&nbsp;
+          {{ form.loc_weight.label }}{{ form.loc_weight(size=10) }}&nbsp;
           {{ form.loc_unit.label }}{{ form.loc_unit }}<br>
         </p>
-    <p>{{ form.loc_collected.label }}{{ form.loc_collected(size=16) }}&nbsp;&nbsp;
+    <p>{{ form.loc_collected.label }}{{ form.loc_collected(size=16) }}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Collector:&nbsp;
       <select name= provname method="GET" action="/">
         {% for prov in prov_list %}
           <option value= "{{prov}}" SELECTED>{{prov}}</option>"
@@ -259,21 +261,21 @@
               {{ form.img_source.label }}{{ form.img_source(size=32) }}<br>
             </p>
             <p>
-              {{ form.img_comments.label }}{{ form.img_comments(size=32) }}&nbsp;
+              {{ form.img_comment.label }}{{ form.img_comment(size=32) }}&nbsp;
               {{ form.img_licence.label }}{{ form.img_licence(size=32) }}<br>
             </p>
       </div>
     </fieldset>
     <p></p>
     <fieldset>
-      <div class="option-heading"><b> Other comments</b> </div>
+      <div class="option-heading"><b> Other comment</b> </div>
       <div class="option-content is-hidden">
       <div style = font-size:16px; font-weight:bold;>
         <p>
           {{ form.ann_ann.label }}{{ form.ann_ann(size=32) }}<br>
         </p>
         <p>
-          {{ form.ann_comments.label }}{{ form.ann_comments(size=32) }}<br>
+          {{ form.ann_comment.label }}{{ form.ann_comment(size=32) }}<br>
         </p>
         <p>
           {{ form.ann_cat.label }}{{ form.ann_cat}}<br>
@@ -282,7 +284,7 @@
       </fieldset>
       <p></p>
       <center>
-         <input type="submit" value="Submit form" style="border:none;background-color:white;font-size: 20px;color:darkblue; font-weight:bold;" >
+         <input type="submit" name="Sform" style="border:none;background-color:white;font-size: 20px;color:darkblue; font-weight:bold;" >
        </center>
 
     </form>

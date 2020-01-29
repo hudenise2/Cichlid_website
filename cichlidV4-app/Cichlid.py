@@ -4,11 +4,11 @@ from flask import Flask, render_template, request,  flash, redirect, url_for, se
 from flask_mysqldb import MySQL
 from flask_migrate import Migrate
 from flask_login import UserMixin, login_user, logout_user, current_user, login_required, LoginManager
-from wtforms import Form, BooleanField, TextField, PasswordField, validators
+from wtforms import Form, BooleanField, TextField, PasswordField, validators, SubmitField
 import hashlib
 from MySQLdb import escape_string as thwart
 import gc, json, time
-import os, glob, binascii
+import os, glob, binascii, re
 from flask_mail import Message, Mail
 from forms import LoginForm, RegistrationForm, EntryForm, EnterDataForm, DatabaseForm
 from config import Config
@@ -282,6 +282,68 @@ def change_for_display(col, data, ext_flag):
             list_new_data = reorder_for_vertical_display(list_new_data)
     return tuple(list_new_columns), tuple(list_new_data)
 
+def check_data(table, dic, criteria):
+    '''function to check if data from a submitted template are already in database and return the corresponding statement or value for the field'''
+    '''
+    input table: table (str) to check the data for
+    input dic: dictionary of data for this table with field as key and entered data as value
+    input criteria: identifier for the table
+    return: dictionary with field and updated value if in the database and string of statement (for input or update) or error message
+    '''
+    curs=mysql.connection.cursor()
+    update_str=""
+    if table =='provider':
+        translate_dic={'pv_mail' : 'email', 'pv_phone': 'phone', 'pv_address':'address'}
+        if 'pv_name' in dic:
+            if 'pv_fname' in dic:
+                criterion=dic['pv_fname']+" "+dic['pv_name']
+            else:
+                criterion=dic['pv_name']
+            #translate provided fields onto entry fields
+            new_dic={translate_dic[x]:y for x,y in dic.items() if len(y) > 0 and x in translate_dic}
+            new_dic['provider_name']=criterion
+    #check if entry is in the database (like statement in case only the provider name was provided)
+    try:
+        curs.execute("select * from "+table+" where LOWER("+criteria+") like '%"+criterion.strip()+"'")
+        db_results=curs.fetchall()
+    except:
+        curs.close()
+        return {}, "Could not connect to table "+table +" or invalid parameters provided."
+    curs.close()
+    #if not in the database then generate insert statement
+    if len(db_results)== 0:
+        #data may need to be inserted into db: write corresponding statemen
+        field_str="("+",".join([x for x in new_dic.keys()])+")"
+        val_str="('"+"','".join(new_dic.values())+"')"
+        return {'provider_name': criterion}, "insert into "+table+" "+field_str+" values "+val_str+";"
+    #if in the database, check if data have to be updated. In any case return the correct provider name
+    else:
+        #data may need to be updated: write corresponding statement
+        db_dic={"provider_name": db_results[0][1], 'email':db_results[0][2], "address": db_results[0][4], "phone": db_results[0][5]}
+        differences_dic={k:v for k,v in new_dic.items() if v!=db_dic[k]}
+        if len(differences_dic) > 0:
+            update_str+=str([x+"='"+y+"'" for x, y in differences_dic.items()])
+            return {"provider_name":db_results[0][1]}, "update PROVIDER set "+update_str[1:-1].replace('"','')+" where provider_name='"+new_dic['provider_name']+"'"
+        else:
+            return {"provider_name":db_results[0][1]},""
+
+def create_suffix():
+    '''function to add suffix to file to ensure that output file is not overwritten'''
+    '''
+    input: none
+    return suffix: string in the format "_\d"
+    '''
+    suffix=""
+    #check if file already exists for today to ensure to not overwrite if multiple upload on the same day by same submitter
+    dir_content=glob.glob("upload_"+today+"*.tsv")
+    if len(dir_content) > 0:
+        existing_suffixes=[file.split("_")[2] for file in dir_content if len(file.split("_"))==4]
+        if len(existing_suffixes) > 0:
+            suffix="_"+str(max([int(x) for x in existing_suffixes])+1)
+        else:
+            suffix="_1"
+    return suffix
+
 def ensure_thumbnails_display(results):
     '''add empty data field to match the column length'''
     '''
@@ -509,16 +571,51 @@ def transpose_table(col, data):
     return vertical_data, blank_position_list
 
 def tuple_to_dic(col, data, json_header):
+    '''Function to reformat tuple data onto hierachical dictionary to generate output for json query'''
+    '''
+    input col (tuple): header for the data reformatted for display as a list (see change_for_display)
+    input data (tuple): data reformatted for display as a list (see change_for_display)
+    input json_header: header (str) to indicate the query as first level of dictionary
+    return final_dic: dictionary with query as top level and a column or data as key and corresponding entries as values
+    '''
     final_dic={}
     final_dic[json_header]={}
     for entry in data:
+        #json_header are plurial so remove the 's' to indicate the query
         identifier=json_header[:-1]
         if json_header=='species':
             identifier=json_header
+        #create empty sub-dictionary
         final_dic[json_header][identifier+"_id="+str(entry[0])]={}
+        #create column entries
         final_dic[json_header][identifier+"_id="+str(entry[0])]['column']=('col','col')+tuple(col)
+        #create data entries
         final_dic[json_header][identifier+"_id="+str(entry[0])]['data']=[('data', 'data',) + tuple(entry)]
     return final_dic
+
+def validation_data(data, headers, issue_list):
+    '''function to check the validity of entries of data imputed on the upload page'''
+    '''
+    input data: list of data corresponding to the field headers
+    input headers: list of field headers
+    input issue_list: list of issues encountered during the upload
+    return issue_list: list of issues updated with validation errors (if any)
+    '''
+    #check value that should be numerical
+    num_fields=['taxon_id', 'material_amount', 'individual_weight', 'latitude', 'longitude', 'project_ssid', 'sample_ssid', 'library_ssid', 'nber_reads']
+    for field in num_fields:
+        if data[headers.index(field)] != "" and not str(data[headers.index(field)]).replace(".","").isdigit():
+            issue_list.append("-  The field "+field+" should be a numeric value")
+    #check date fields
+    date_not_validate=""
+    for field in ['date_collected', 'date_received']:
+        if data[headers.index(field)] != "" and len(data[headers.index(field)].split("-"))!=3 and not data[headers.index(field)].replace(" ","").isdigit():
+            issue_list.append("-  The field "+field+" should be in correct data format (YYYY-MM-DD)")
+    if len(data[headers.index("md5")]) !=0 and len(data[headers.index("md5")]) !=31:
+        issue_list.append("-  The field md5 should be of 31 characters long")
+    if data[headers.index("image_name")] !="" and data[headers.index("image_name")].split(".")[1].lower() not in ['jpg', 'png', 'svg']:
+        issue_list.append("-  The extension provided for the field image is not valid ('jpg', 'png', 'svg' accepted)")
+    return issue_list
 
 def webresults_to_dic(results):
     """ function to transform data for display into subdictionaries to generate downloadable json"""
@@ -547,6 +644,111 @@ def webresults_to_dic(results):
         return_list=[]
     return return_dic
 
+def write_data(usr_data, usrname):
+    '''Function to write data submitted on the upload page as a tsv file'''
+    '''
+    input usr_data: list of tuple collecting the data entered onto the form on the upload page
+    return call to enter_data page
+    '''
+    full_column_list=['option', 'individual_name', 'alias', 'sex', 'species_name', 'taxon_id', 'common_name', 'taxon_position', 'date_collected', 'collection_method', 'collection_details',
+     'collector_name', 'country', 'location', 'location_details', 'latitude', 'longitude', 'developmental_name', 'individual_weight', 'unit', 'organism_part', 'individual_comment', 'image_name',
+     'image_path', 'image_comment', 'image_licence', 'material_name', 'material_accession', 'material_type', 'date_received', 'storage_condition', 'material_location',
+     'material_amount', 'material_unit', 'material_comment', 'material_provider_name', 'project_name', 'project_alias', 'project_ssid', 'project_accession', 'sample_name', 'sample_accession',
+     'sample_ssid', 'sample_comment', 'lane_name', 'lane_accession', 'library_name', 'library_ssid', 'file_name', 'file_accession', 'format', 'paired-end', 'md5', 'filepath', 'file_comment',
+     'nber_reads', 'seq_centre', 'seq_tech']
+    form_column_dic={'Option':0, 'ind_name':1, 'ind_alias':2, 'Gender':3, 'dev_stage':17, 'ind_comment':21, 'sp_name':4, 'sp_cname':6, 'sp_taxid':5, 'sp_taxpos':7, 'provname':11,
+     'pv_name':11, 'mat_name':26, 'mat_acc':27, 'mat_type':28, 'mat_part':20, 'mat_cond':30, 'mat_location':31, 'mat_wgt':32, 'mat_unit':33, 'mat_received':29,
+     'mat_comment':34, 'mat_provider':35,'loc_country':12, 'loc_region':13, 'loc_details':14, 'loc_lat':15, 'loc_lng':16, 'loc_method':9, 'loc_weight':18, 'loc_unit':19, 'loc_collected':8, 'prj_name':36,
+     'prj_alias':37, 'prj_acc':39, 'prj_ssid':38, 'spl_name':40, 'spl_accession':41, 'spl_ssid':42, 'spl_comment':43, 'lane_name':44, 'lane_accession':45, 'lib_name':46, 'lib_ssid':46,
+     'file_name':48, 'file_accession':49, 'file_format':50, 'file_PE':51, 'file_reads':55, 'file_md5':52, 'file_path':53, 'file_comment':54, 'seq_tech':57, 'seq_centre':56, 'img_name':22,
+     'img_source':23, 'img_comment':24, 'img_licence':25}
+    annotations_table_dic={'ext': 'material', 'col': 'individual', 'stg': 'material', 'seq': 'sample'}
+    annotations_dic={}
+    provider_dic={}
+    header_submission=[]
+    data_submitted=[""]*len(full_column_list)
+    suffix=create_suffix()
+    #create output file
+    File_output=open("upload_"+today+suffix+"_"+usrname+".tsv", "w+")
+    #reformat usr_data onto a list with the same mumber of elements than the
+    for header in usr_data:
+        if header not in ('csrf_token', 'Upload', 'Sform'):
+            #case where there is annotations added to the end of the full_column_list
+            if  header in ['ann_ann', 'ann_comment', 'ann_cat']:
+                if len(usr_data[header]) > 0:
+                    annotations_dic[header]= usr_data[header]
+            #case where provider info is provided
+            elif header in ['pv_name', 'pv_fname', 'pv_mail', 'pv_phone', 'pv_address']:
+                if len(usr_data[header]) > 0:
+                     provider_dic[header]=usr_data[header]
+            else:
+                #group mat location and mat loca position (2 fields in the entry page)
+                if header == "mat_loc_pos":
+                    if  len(str(usr_data["mat_loc_pos"])) != 0:
+                        data_submitted[form_column_dic["mat_location"]]+=", "+str(usr_data["mat_loc_pos"])
+                else:
+                    data_submitted[form_column_dic[header]]=usr_data[header]
+    #Check that the individual name field is present as it is the only compulsory field
+    if data_submitted[form_column_dic["ind_name"]] =="":
+        flash("-  The individual name is an essential field for any submission")
+        return redirect(url_for('enter_data'))
+    else:
+        if annotations_dic['ann_cat'] != 'unk':
+            #get which table the comment should be associated with
+            ann_table = annotations_table_dic[annotations_dic['ann_cat']]
+            annotations_dic['value']=annotations_dic['ann_ann']
+            annotations_dic['comment']=annotations_dic['ann_comment']
+            if annotations_dic['ann_ann'] != "":
+            #if comment already listed in header list, add to data in data_submitted
+                index_field=full_column_list.index(ann_table+"_comment")
+                if data_submitted[index_field]=="":
+                    data_submitted[index_field]=annotations_dic['ann_ann'] + " ("+annotations_dic['ann_comment']+")"
+                else:
+                    data_submitted[index_field]+="; "+annotations_dic['ann_ann'] + " ("+annotations_dic['ann_comment']+")"
+        issues=[]
+        if len(provider_dic)>0:
+            if 'pv_name' not in provider_dic:
+                flash("-  The provider name is an essential field for the provider section")
+                return redirect(url_for('enter_data'))
+            else:
+                #validation of entries
+                email_regex = '^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'
+                if 'pv_mail' in provider_dic and not re.search(email_regex, provider_dic['pv_mail']):
+                    issues.append("The provider's email you submitted is incorrect")
+                if 'pv_phone' in provider_dic and not provider_dic['pv_phone'].replace(" ","").isdigit():
+                    issues.append("The provider's phone you submitted is incorrect")
+                #check how to deal with data for provider table
+                provider_statement=check_data("provider", provider_dic, "provider_name")
+                #case where data is in the database so add to data_submitted
+                if provider_statement[1] =="":
+                    data_submitted[full_column_list.index('collector_name')]=provider_statement[0]['provider_name']
+                else:
+                    #case where the data do not allow to query the database
+                    if provider_statement[1].startswith("Could not"):
+                        flash(provider_statement[1])
+                        return redirect(url_for('enter_data'))
+                    #case where data is not in the database or need updated: write update or insert statement into output file and update data_submitted with the provider name
+                    File_output.write(provider_statement[1]+"\n\n")
+                    data_submitted[full_column_list.index('collector_name')]=provider_statement[0]['provider_name']
+        #clean up data_submitted:
+        data_submitted=[x.replace("unk","") for x in data_submitted]
+        data_submitted=[x.replace("-select-","") for x in data_submitted]
+        if data_submitted[full_column_list.index('individual_weight')]=="":
+            data_submitted[full_column_list.index('unit')]=""
+        if data_submitted[full_column_list.index('material_amount')]=="":
+            data_submitted[full_column_list.index('material_unit')]=""
+        validation_issues=validation_data(data_submitted, full_column_list, issues)
+        if len(validation_issues) > 0:
+            flash("! THE FOLLOWING FIELD(S) WERE NOT VALIDATED: ")
+            for issue in validation_issues:
+                flash(issue)
+            return redirect(url_for('enter_data'))
+        else:
+            File_output.write("=".join(full_column_list)+"\n")
+            File_output.write("=".join(data_submitted)+"\n")
+            flash("Data successfully submitted")
+            return redirect(url_for('enter_data'))
+
 ################### PASSWORD FUNCTIONS #########################################
 def hash_password(password):
     """Hash a password for storing."""
@@ -571,6 +773,65 @@ def verify_password(stored_password, provided_password):
     return pwdhash == stored_password
 
 ################### WEB APP FUNCTIONS ##########################################
+@app.route('/api/1.1/download', methods=['GET', 'POST'])
+def download():
+    """function to provide the csv template to enter data"""
+    return send_file("entry.tsv",
+        mimetype="text/tsv", attachment_filename='entry.tsv', as_attachment=True)
+
+@app.route('/api/1.1/enter_data', methods=['GET', 'POST'])
+def enter_data():
+    """function for the entry page where user can update, overwrite or enter new data in the database"""
+    usrname=session.get('usrname', None)
+    form = EnterDataForm(request.form)
+    form.Usrname.choices=((usrname))
+    provider_list=[]
+    curs = mysql.connection.cursor()
+    try:
+        curs.execute("SELECT distinct provider_name FROM provider")
+        provider_res=curs.fetchall()
+    except:
+        if ext_flag=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch provider names")
+    curs.close()
+    for prov in provider_res:
+        provider_list.append(prov[0])
+    provider_list.append("-select-")
+    #provider_list.append("-choose providers-")
+    if request.method == "POST" and form.validate():
+        results=request.form
+        session['usrname']=usrname
+        if 'Download' in results:
+            return redirect(url_for('download'))
+        elif 'Sform' in results:
+            write_flag=write_data(results, usrname)
+            if write_flag==0:
+                flash("your data have been submitted successfully")
+                return redirect(url_for('enter_data'))
+        elif 'Upload' in results:
+            if len(results['Upload'])>0:
+                return redirect(url_for('upload', file = results['Upload']))
+            else:
+                flash("Please, choose a file to upload")
+    session['usrname']=usrname
+    return render_template('enter_data.html', usrname=usrname, form=form, prov_list=tuple(provider_list), db=db, session=session)
+
+@app.route('/api/1.1/faq', methods=['GET', 'POST'])
+def faq():
+    """function to display the faq page"""
+    proj=[]
+    if db=='cichlid':
+        proj.append('East-African cichlid')
+        proj.append('D01-A03')
+        proj.append('Liwonde')
+    elif db=='darwin':
+        proj.append('Darwin')
+        proj.append('fMasArm1')
+        proj.append('Sumatra')
+    return render_template("faq.html", db=db, log=session['logged_in'], proj=proj, usrname=session.get('usrname', None))
+
 #@app.route('/')
 #@app.route('/index')
 @app.route('/index', methods=['GET', 'POST'])
@@ -695,41 +956,21 @@ def index():
             flash("Please enter valid criteria")
     return render_template("entry.html", title='Query was: returnall', form=form, project_list=tuple(list_proj), loc_list=tuple(list_loc), db=db, ext_flag=ext_flag, log=status, usrname=session.get('usrname', None))
 
-@app.route('/dashboard/')
-def dashboard():
-    return render_template("tab.html")
-
-@app.route('/api/1.1/entry', methods=['GET', 'POST'])
-def enter_data():
-    """function for the entry page where user can update, overwrite or enter new data in the database"""
-    usrname=session.get('usrname', None)
-    form = EnterDataForm(request.form)
-    provider_list=[]
-    curs = mysql.connection.cursor()
-    try:
-        curs.execute("SELECT distinct provider_name FROM provider")
-        provider_res=curs.fetchall()
-    except:
-        if ext_flag=='json':
-            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
-        else:
-            flash ("Error: unable to fetch provider names")
-    curs.close()
-    provider_list.append("-choose providers-")
-    for prov in provider_res:
-        provider_list.append(prov[0])
-    #provider_list.append("-choose providers-")
-    if request.method == "POST" and form.validate():
-        results=request.form
-        session['usrname']=usrname
-        if 'Download' in results:
-            return redirect(url_for('download'))
-        elif 'Upload' in results:
-            return redirect(url_for('upload', file = results['Upload']))
-        else:
-            flash("your data have been submitted successfully")
-            return redirect(url_for('enter_data'))
-    return render_template('enter_data.html', usrname=usrname, form=form, prov_list=tuple(provider_list), db=db, session=session)
+@app.route('/api/1.1/info', methods=['GET', 'POST'])
+def info():
+    """function to display the about page"""
+    proj=[]
+    if db=='cichlid':
+        proj.append(['East-African cichlid','The research involves studying evolutionary and population genetics in cichlid fishes via whole genome sequences and associated phenotypic variation.'])
+        proj.append('This website and much of the data in it are funded by Wellcome grant WT207492.')
+        proj.append('We thank our collaborators George Turner (Bangor University), Martin Genner (University of Bristol), Hannes Svardal (University of Antwerp), Eric Miska (Gurdon Institute, Cambridge), Emilia Santos (Dept. of Zoology, Cambridge) and members of their teams, and Milan Malinsky (University of Basel) for contributing samples and data.')
+        proj.append([['https://www.ncbi.nlm.nih.gov/pubmed/30455444', 'Whole-genome sequences of Malawi cichlids reveal multiple radiations interconnected by gene flow.'],['Malinsky M, Svardal H, Tyers AM, Miska EA, Genner MJ, Turner GF, Durbin R', 'Nat Ecol Evol. 2018 Dec;2(12):1940-1955','doi: 10.1038/s41559-018-0717-x.']])
+    elif db=='darwin':
+        proj.append(['Darwin Tree of Life','This project aims at sequencing all species of animal and plant in the United Kingdom.'])
+        proj.append('Richard Durbin')
+        proj.append('names of people involve (TBC)')
+        proj.append([['https://www.sanger.ac.uk/news/view/genetic-code-60000-uk-species-be-sequenced', 'Genetic code of 60,000 UK species to be sequenced'], ['Wellcome Sanger Institute']])
+    return render_template("about.html", db=db, log=session['logged_in'], proj=proj, usrname=session.get('usrname', None))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -758,7 +999,7 @@ def login():
             if compare:
                 session['usrname']=rows[0][1]
                 session['logged_in']=1
-                return redirect(url_for('enter_data'))
+                return redirect(url_for('enter_data', usrname=session['usrname']))
             else:
                 flash('Invalid password provided')
                 return redirect(url_for('login'))
@@ -810,19 +1051,10 @@ def register():
         return("Issue: "+str(e))
     return render_template('register.html', title='Register', form=form, db=db)
 
-@app.route('/api/1.1/download', methods=['GET', 'POST'])
-def download():
-    """function to provide the csv template to enter data"""
-    return send_file("entry.tsv",
-        mimetype="text/tsv",
-        attachment_filename='entry.tsv',
-                     as_attachment=True)
-
 @app.route('/api/1.1/upload/<file>', methods=['GET', 'POST'])
 def upload(file):
     """function to reupload the filled csv template to add, update or overwrite the database"""
     f = open(file, 'r')
-    usrname=session.get('usrname', None)
     suffix=""
     #only keep lines with data
     File = [line for line in f if len(line.split(",")[0]) > 0]
@@ -834,42 +1066,13 @@ def upload(file):
             suffix="_"+str(int(max(existing_suffixes))+1)
         else:
             suffix="_1"
-    flash ('file uploaded successfully')
+    usrname=session.get('usrname', None)
     #save File as a tab-separated file
     with open("upload_"+today+suffix+"_"+usrname+".tsv", "w") as File_output:
         for line in File:
             File_output.write(line)
+    flash ('file uploaded successfully')
     return redirect(url_for('enter_data'))
-
-@app.route('/api/1.1/info', methods=['GET', 'POST'])
-def info():
-    """function to display the about page"""
-    proj=[]
-    if db=='cichlid':
-        proj.append(['East-African cichlid','The research involves studying evolutionary and population genetics in cichlid fishes via whole genome sequences and associated phenotypic variation.'])
-        proj.append('This website and much of the data in it are funded by Wellcome grant WT207492.')
-        proj.append('We thank our collaborators George Turner (Bangor University), Martin Genner (University of Bristol), Hannes Svardal (University of Antwerp), Eric Miska (Gurdon Institute, Cambridge), Emilia Santos (Dept. of Zoology, Cambridge) and members of their teams, and Milan Malinsky (University of Basel) for contributing samples and data.')
-        proj.append([['https://www.ncbi.nlm.nih.gov/pubmed/30455444', 'Whole-genome sequences of Malawi cichlids reveal multiple radiations interconnected by gene flow.'],['Malinsky M, Svardal H, Tyers AM, Miska EA, Genner MJ, Turner GF, Durbin R', 'Nat Ecol Evol. 2018 Dec;2(12):1940-1955','doi: 10.1038/s41559-018-0717-x.']])
-    elif db=='darwin':
-        proj.append(['Darwin Tree of Life','This project aims at sequencing all species of animal and plant in the United Kingdom.'])
-        proj.append('Richard Durbin')
-        proj.append('names of people involve (TBC)')
-        proj.append([['https://www.sanger.ac.uk/news/view/genetic-code-60000-uk-species-be-sequenced', 'Genetic code of 60,000 UK species to be sequenced'], ['Wellcome Sanger Institute']])
-    return render_template("about.html", db=db, log=session['logged_in'], proj=proj, usrname=session.get('usrname', None))
-
-@app.route('/api/1.1/faq', methods=['GET', 'POST'])
-def faq():
-    """function to display the faq page"""
-    proj=[]
-    if db=='cichlid':
-        proj.append('East-African cichlid')
-        proj.append('D01-A03')
-        proj.append('Liwonde')
-    elif db=='darwin':
-        proj.append('Darwin')
-        proj.append('fMasArm1')
-        proj.append('Sumatra')
-    return render_template("faq.html", db=db, log=session['logged_in'], proj=proj, usrname=session.get('usrname', None))
 
 ################### API RELATED FUNCTIONS ######################################
 @app.route('/api/1.1/file/<f_id>/<ext_flag>', methods=['GET'])
