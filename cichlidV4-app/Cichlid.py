@@ -609,7 +609,8 @@ def validation_data(data, headers, issue_list):
     #check date fields
     date_not_validate=""
     for field in ['date_collected', 'date_received']:
-        if data[headers.index(field)] != "" and len(data[headers.index(field)].split("-"))!=3 and not data[headers.index(field)].replace(" ","").isdigit():
+        date_regex='^[1-2]\d\d\d-[0-1]\d-[0-3]\d+$'
+        if data[headers.index(field)] != "" and not re.search(date_regex, data[headers.index(field)]):
             issue_list.append("-  The field "+field+" should be in correct data format (YYYY-MM-DD)")
     if len(data[headers.index("md5")]) !=0 and len(data[headers.index("md5")]) !=31:
         issue_list.append("-  The field md5 should be of 31 characters long")
@@ -738,6 +739,7 @@ def write_data(usr_data, usrname):
         if data_submitted[full_column_list.index('material_amount')]=="":
             data_submitted[full_column_list.index('material_unit')]=""
         validation_issues=validation_data(data_submitted, full_column_list, issues)
+        session['usrname']=usrname
         if len(validation_issues) > 0:
             flash("! THE FOLLOWING FIELD(S) WERE NOT VALIDATED: ")
             for issue in validation_issues:
@@ -783,7 +785,7 @@ def download():
 def enter_data():
     """function for the entry page where user can update, overwrite or enter new data in the database"""
     usrname=session.get('usrname', None)
-    form = EnterDataForm(request.form)
+    form = EnterDataForm()
     form.Usrname.choices=((usrname))
     provider_list=[]
     curs = mysql.connection.cursor()
@@ -800,7 +802,7 @@ def enter_data():
         provider_list.append(prov[0])
     provider_list.append("-select-")
     #provider_list.append("-choose providers-")
-    if request.method == "POST" and form.validate():
+    if request.method == "POST" and form.validate_on_submit():
         results=request.form
         session['usrname']=usrname
         if 'Download' in results:
