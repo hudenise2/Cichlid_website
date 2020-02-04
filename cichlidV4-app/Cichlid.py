@@ -15,7 +15,7 @@ from config import Config
 app = Flask(__name__)
 
 '''
-    Website script written by H. Denise (Cambridge Uni) 27/11/2019
+    Website script written by H. Denise (Cambridge Uni) 31/01/2020
     Script for the Cichlid database
 '''
 #initialisation of connection
@@ -26,6 +26,8 @@ app.config['MYSQL_HOST'] = configSettings["MySQL_host"]
 app.config['MYSQL_USER'] = configSettings["MySQL_usr"]
 app.config['MYSQL_PASSWORD'] = configSettings["MySQL_pswd"]
 app.config['MYSQL_DB'] = configSettings["MySQL_db"]
+OUTPATH=configSettings["OUTPATH"]
+TMPPATH=configSettings["TMPPATH"]
 mail_settings = {
     "MAIL_SERVER": configSettings["Mail_server"],
     "MAIL_PORT": configSettings["Mail_port"],
@@ -44,6 +46,7 @@ session={}
 session['logged_in']=0
 db='cichlid'
 today=time.strftime("%Y-%m-%d")
+time_stamp=time.strftime("%Y-%m-%d-%H-%M-%S")
 ################### DATA PROCESSING FUNCTIONS ##################################
 def add_individual_data_info(col, data):
     """adding individual_data information if available to 'individual' display"""
@@ -327,23 +330,6 @@ def check_data(table, dic, criteria):
         else:
             return {"provider_name":db_results[0][1]},""
 
-def create_suffix():
-    '''function to add suffix to file to ensure that output file is not overwritten'''
-    '''
-    input: none
-    return suffix: string in the format "_\d"
-    '''
-    suffix=""
-    #check if file already exists for today to ensure to not overwrite if multiple upload on the same day by same submitter
-    dir_content=glob.glob("upload_"+today+"*.tsv")
-    if len(dir_content) > 0:
-        existing_suffixes=[file.split("_")[2] for file in dir_content if len(file.split("_"))==4]
-        if len(existing_suffixes) > 0:
-            suffix="_"+str(max([int(x) for x in existing_suffixes])+1)
-        else:
-            suffix="_1"
-    return suffix
-
 def ensure_thumbnails_display(results):
     '''add empty data field to match the column length'''
     '''
@@ -355,6 +341,23 @@ def ensure_thumbnails_display(results):
         if len(results['individual']['data'][entry_index]) < col_length:
             results['individual']['data'][entry_index]=results['individual']['data'][entry_index]+(col_length-len(results['individual']['data'][entry_index]))*[""]
     return results
+
+def get_file_suffix(filename):
+    '''function to generate unique suffix to for output files'''
+    '''
+    input filename: name (str) of the file to look for in the folder (form_upload_"+today+"*.tsv or file_upload_"+today+"*.tsv)
+    return suffix: unique suffix (str) with underscore and a digit or blank if not already submitted this day for this user
+    '''
+    suffix=""
+    #check if file already exists for today to ensure to not overwrite if multiple upload on the same day by same submitter
+    dir_content=glob.glob(OUTPATH+filename)
+    if len(dir_content) > 0:
+        existing_suffixes=[file.split("/")[-1].split("_")[-2] for file in dir_content if len(file.split("/")[-1].split("_"))==5]
+        if len(existing_suffixes) > 0:
+            suffix="_"+str(int(max(existing_suffixes))+1)
+        else:
+            suffix="_1"
+    return suffix
 
 def generate_json_for_display(res_dic, col_dic, ext_flag, identifier):
     '''reformat data as json for the web display and also to download as json '''
@@ -593,6 +596,53 @@ def tuple_to_dic(col, data, json_header):
         final_dic[json_header][identifier+"_id="+str(entry[0])]['data']=[('data', 'data',) + tuple(entry)]
     return final_dic
 
+def upload(file, usrname):
+    """function to open the filled csv template to add, update or overwrite the database, reformat it and save it to be uploaded"""
+    '''
+    input file: name (str) of the file saved in the temp folder after submission
+    input usrname: name (str) of the usrname for the session
+    return none
+    '''
+    input_file = open(TMPPATH+file,'r')
+    suffix=""
+    #check the separator in file and transform in tab
+    first_line = input_file.readline()
+    option_index=first_line.index("option")
+    individual_name_index=first_line.index("individual_name")
+    separator=first_line[option_index+6:individual_name_index]
+    #only keep lines with data
+    File = [line.replace(separator,"\t") for line in input_file if len(line.split(separator)) > 0]
+    input_file.close()
+    line_count=0
+    #very basic validation of submitted file:
+    if first_line.startswith("HEADER") or first_line.startswith("option"):
+        suffix= get_file_suffix("file_upload_"+today+"*.tsv")
+        #save File as a tab-separated file
+        with open(OUTPATH+"file_upload_"+today+suffix+"_"+usrname+".tsv", "w") as File_output:
+            File_output.write(first_line.replace(separator,"\t"))
+            for line in File:
+                #avoid the example line if let in (2 checks depending on first column (HEADER, EXAMPLE) being left in or not) and ensure the option field is filled
+                if not line.startswith("EXAMPLE") and not line.split("\t")[2]=='test_entry':
+                    #if the option is not provided: assume it is a new data and add field to file
+                    if line.split("\t")[first_line.split("\t").index("option")]=="":
+                        new_line_list=line.split("\t")
+                        new_line_list[first_line.split("\t").index("option")]="new_record"
+                        line="\t".join(new_line_list)
+                    File_output.write(line)
+                    line_count+=1
+        File_output.close()
+        #if nothing is written: delete output file
+        if line_count==0: os.remove(OUTPATH+"file_upload_"+today+suffix+"_"+usrname+".tsv")
+        #if upload successful: remove the tmp file
+        os.remove(TMPPATH+file)
+        session['usrname']=usrname
+        flash ('file uploaded successfully')
+        return redirect(url_for('enter_data'))
+    else:
+        session['usrname']=usrname
+        flash ('The file you submitted does not contain the headers provided in the template. Please correct and re-upload')
+        return redirect(url_for('enter_data'))
+
 def validation_data(data, headers, issue_list):
     '''function to check the validity of entries of data imputed on the upload page'''
     '''
@@ -668,9 +718,9 @@ def write_data(usr_data, usrname):
     provider_dic={}
     header_submission=[]
     data_submitted=[""]*len(full_column_list)
-    suffix=create_suffix()
+    suffix=get_file_suffix("form_upload_"+today+"*.tsv")
     #create output file
-    File_output=open("upload_"+today+suffix+"_"+usrname+".tsv", "w+")
+    File_output=open(OUTPATH+"form_upload_"+today+suffix+"_"+usrname+".tsv", "w+")
     #reformat usr_data onto a list with the same mumber of elements than the
     for header in usr_data:
         if header not in ('csrf_token', 'Upload', 'Sform'):
@@ -692,6 +742,7 @@ def write_data(usr_data, usrname):
     #Check that the individual name field is present as it is the only compulsory field
     if data_submitted[form_column_dic["ind_name"]] =="":
         flash("-  The individual name is an essential field for any submission")
+        session['usrname']=usrname
         return redirect(url_for('enter_data'))
     else:
         if annotations_dic['ann_cat'] != 'unk':
@@ -710,6 +761,7 @@ def write_data(usr_data, usrname):
         if len(provider_dic)>0:
             if 'pv_name' not in provider_dic:
                 flash("-  The provider name is an essential field for the provider section")
+                session['usrname']=usrname
                 return redirect(url_for('enter_data'))
             else:
                 #validation of entries
@@ -744,11 +796,14 @@ def write_data(usr_data, usrname):
             flash("! THE FOLLOWING FIELD(S) WERE NOT VALIDATED: ")
             for issue in validation_issues:
                 flash(issue)
+            session['usrname']=usrname
             return redirect(url_for('enter_data'))
         else:
-            File_output.write("=".join(full_column_list)+"\n")
-            File_output.write("=".join(data_submitted)+"\n")
+            File_output.write("\t".join(full_column_list)+"\n")
+            File_output.write("\t".join(data_submitted)+"\n")
             flash("Data successfully submitted")
+            File_output.close()
+            session['usrname']=usrname
             return redirect(url_for('enter_data'))
 
 ################### PASSWORD FUNCTIONS #########################################
@@ -775,15 +830,15 @@ def verify_password(stored_password, provided_password):
     return pwdhash == stored_password
 
 ################### WEB APP FUNCTIONS ##########################################
-@app.route('/api/1.1/download', methods=['GET', 'POST'])
+@app.route('/'+db+'/api/1.1/download', methods=['GET', 'POST'])
 def download():
     """function to provide the csv template to enter data"""
     return send_file("entry.tsv",
         mimetype="text/tsv", attachment_filename='entry.tsv', as_attachment=True)
 
-@app.route('/api/1.1/enter_data', methods=['GET', 'POST'])
+@app.route('/'+db+'/api/1.1/enter_data', methods=['GET', 'POST'])
 def enter_data():
-    """function for the entry page where user can update, overwrite or enter new data in the database"""
+    """function to provide for the entry page where user can update, overwrite or enter new data in the database"""
     usrname=session.get('usrname', None)
     form = EnterDataForm()
     form.Usrname.choices=((usrname))
@@ -802,25 +857,36 @@ def enter_data():
         provider_list.append(prov[0])
     provider_list.append("-select-")
     #provider_list.append("-choose providers-")
-    if request.method == "POST" and form.validate_on_submit():
-        results=request.form
-        session['usrname']=usrname
-        if 'Download' in results:
-            return redirect(url_for('download'))
-        elif 'Sform' in results:
-            write_flag=write_data(results, usrname)
-            if write_flag==0:
-                flash("your data have been submitted successfully")
-                return redirect(url_for('enter_data'))
-        elif 'Upload' in results:
-            if len(results['Upload'])>0:
-                return redirect(url_for('upload', file = results['Upload']))
+    if request.method == "POST" :
+        #save file in a temp folder if re-uploading a fill template
+        if request.form['Sform'] == 'submit':
+            session['usrname']=usrname
+            results=request.form
+            upload_file=request.files['file']
+            if upload_file.filename=="":
+                session['usrname']=usrname
+                flash("Please choose a file to upload")
             else:
-                flash("Please, choose a file to upload")
+                upload_name=".".join(upload_file.filename.split(".")[:-1])+"_"+time_stamp+"_"+usrname+"."+upload_file.filename.split(".")[-1]
+                upload_file.save(os.path.join(TMPPATH, upload_name))
+                session['usrname']=usrname
+                upload(upload_name, usrname)
+        else:
+            #write data onto a tab separated file if filling the form
+            results=request.form
+            session['usrname']=usrname
+            if 'Download' in results:
+                return redirect(url_for('download'))
+            elif 'Sform' in results:
+                write_flag=write_data(results, usrname)
+                if write_flag==0:
+                    flash("your data have been submitted successfully")
+                    session['usrname']=usrname
+                    return redirect(url_for('enter_data'))
     session['usrname']=usrname
     return render_template('enter_data.html', usrname=usrname, form=form, prov_list=tuple(provider_list), db=db, session=session)
 
-@app.route('/api/1.1/faq', methods=['GET', 'POST'])
+@app.route('/'+db+'/api/1.1/faq', methods=['GET', 'POST'])
 def faq():
     """function to display the faq page"""
     proj=[]
@@ -836,7 +902,7 @@ def faq():
 
 #@app.route('/')
 #@app.route('/index')
-@app.route('/index', methods=['GET', 'POST'])
+@app.route('/cichlid/index', methods=['GET', 'POST'])
 def index():
     """main function for the main page where user can choose the way to interrogate the database"""
     individual_name=""
@@ -923,6 +989,7 @@ def index():
         'SL': [species_name,loc_region], 'IS':[individual_name, species_name], 'X': sample_name,
         'SX':[sample_name, species_name], 'AX':[sample_name, project_acc.split(" - ")[0]],
         'IX' : [sample_name, individual_name], 'XL' : [sample_name, loc_region]}
+        usrname=session.get('usrname', None)
         if flag == 'A':
             return redirect(url_for(url_dic[flag], accession=arg_dic[flag], ext_flag=ext_flag))
         elif flag == 'AI':
@@ -958,7 +1025,7 @@ def index():
             flash("Please enter valid criteria")
     return render_template("entry.html", title='Query was: returnall', form=form, project_list=tuple(list_proj), loc_list=tuple(list_loc), db=db, ext_flag=ext_flag, log=status, usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/info', methods=['GET', 'POST'])
+@app.route('/'+db+'/api/1.1/info', methods=['GET', 'POST'])
 def info():
     """function to display the about page"""
     proj=[]
@@ -1053,31 +1120,8 @@ def register():
         return("Issue: "+str(e))
     return render_template('register.html', title='Register', form=form, db=db)
 
-@app.route('/api/1.1/upload/<file>', methods=['GET', 'POST'])
-def upload(file):
-    """function to reupload the filled csv template to add, update or overwrite the database"""
-    f = open(file, 'r')
-    suffix=""
-    #only keep lines with data
-    File = [line for line in f if len(line.split(",")[0]) > 0]
-    #check if file already exists for today to ensure to not overwrite if multiple upload on the same day by same submitter
-    dir_content=glob.glob("upload_"+today+"*.tsv")
-    if len(dir_content) > 0:
-        existing_suffixes=[file.split("_")[2] for file in dir_content if len(file.split("_"))==4]
-        if len(existing_suffixes) > 0:
-            suffix="_"+str(int(max(existing_suffixes))+1)
-        else:
-            suffix="_1"
-    usrname=session.get('usrname', None)
-    #save File as a tab-separated file
-    with open("upload_"+today+suffix+"_"+usrname+".tsv", "w") as File_output:
-        for line in File:
-            File_output.write(line)
-    flash ('file uploaded successfully')
-    return redirect(url_for('enter_data'))
-
 ################### API RELATED FUNCTIONS ######################################
-@app.route('/api/1.1/file/<f_id>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/file/<f_id>/<ext_flag>', methods=['GET'])
 def get_file_per_file_id(f_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
@@ -1150,9 +1194,9 @@ def get_file_per_file_id(f_id, ext_flag):
             for_display=session['criteria']
         else:
             for_display="file name (file_id)= '"+fresults[0][3]+"' ("+str(f_id)+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['file',  0, '/web' ], results=web_results, plus=['/api/1.1/file/'+f_id+'/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='file')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['file',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/file/'+f_id+'/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='file')
 
-@app.route('/api/1.1/file/<f_id>/all/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/file/<f_id>/all/<ext_flag>', methods=['GET'])
 def get_file_per_file_id_all(f_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
@@ -1221,9 +1265,9 @@ def get_file_per_file_id_all(f_id, ext_flag):
             for_display=session['criteria']
         else:
             for_display="file name (file_id)= '"+fresults[0][3]+"' ("+str(f_id)+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['file',  0, '/web' ], results=web_results, plus=['/api/1.1/file/'+f_id+'/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='file')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['file',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/file/'+f_id+'/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='file')
 
-@app.route('/api/1.1/image/<im_id>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/image/<im_id>/<ext_flag>', methods=['GET'])
 def get_image_per_image_id(im_id, ext_flag):
     results=[]
     columns=get_columns_from_table('image')
@@ -1252,7 +1296,7 @@ def get_image_per_image_id(im_id, ext_flag):
             session['criteria']="image name (image_id)= "+str(img_results[0][-1]) +" ("+str(im_id)+")"
             return redirect(url_for('get_individual_per_individual_id', i_id="("+str(img_results[0][0])+")", ext_flag=ext_flag))
 
-@app.route('/api/1.1/image/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/image/<ext_flag>', methods=['GET'])
 def get_images(ext_flag):
     results=[]
     columns=get_columns_from_table('image')
@@ -1285,7 +1329,7 @@ def get_images(ext_flag):
         #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed)crumbs (to display navigation history))
         return render_template("image2.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/image/all/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/image/all/<ext_flag>', methods=['GET'])
 def get_images_all(ext_flag):
     results=[]
     columns=get_columns_from_table('image')
@@ -1317,9 +1361,9 @@ def get_images_all(ext_flag):
             return jsonify(webresults_to_dic(json_results))
         else:
             #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
-            return render_template("image2.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['/api/1.1/image/web', 'no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+            return render_template("image2.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['/'+db+'/api/1.1/image/web', 'no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/individual/<i_id>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/individual/<i_id>/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_id(i_id, ext_flag):
     pcolumns=list(get_columns_from_table('project'))
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
@@ -1400,9 +1444,9 @@ def get_individual_per_individual_id(i_id, ext_flag):
             for_display=session['criteria']
         else:
             for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+space_i_id+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/('+i_id+')/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/individual/('+i_id+')/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
-@app.route('/api/1.1/individual/<i_id>/all/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/individual/<i_id>/all/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_id_all(i_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     ind_columns=get_columns_from_table('individual')
@@ -1483,9 +1527,9 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
             for_display=session['criteria']
         else:
             for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+space_i_id+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/api/1.1/individual/('+i_id+')/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/individual/('+i_id+')/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
-@app.route('/api/1.1/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_name(ind_name, ext_flag):
     ind_list=ind_name.replace(" ","").replace(",", "','")
     results=""
@@ -1514,7 +1558,7 @@ def get_individual_per_individual_name(ind_name, ext_flag):
         else:
             return(redirect(url_for('get_individual_per_individual_id', i_id=results[1:], db=db, ext_flag=ext_flag)))
 
-@app.route('/api/1.1/individual/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/individual/<ext_flag>', methods=['GET'])
 def get_individuals(ext_flag):
     icolumns=get_columns_from_table('individual')
     columns=list(icolumns[1:8]+tuple(['samples']))
@@ -1548,9 +1592,9 @@ def get_individuals(ext_flag):
                 return redirect(url_for('get_images', ext_flag=ext_flag))
             else:
                 #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
-                return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[columns, remove_column(display_results, 'L')], plus=['/api/1.1/individual/all/web', 'yes'], db=db, ext_flag=ext_flag,  log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
+                return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[columns, remove_column(display_results, 'L')], plus=['all/web', 'yes'], db=db, ext_flag=ext_flag,  log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
-@app.route('/api/1.1/individual/all/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/individual/all/<ext_flag>', methods=['GET'])
 def get_individuals_all(ext_flag):
     ind_columns=get_columns_from_table('individual')
     ind_id_columns=get_columns_from_table('individual_data')
@@ -1585,9 +1629,9 @@ def get_individuals_all(ext_flag):
                 return redirect(url_for('get_images', ext_flag=ext_flag))
             else:
                 #for classical display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
-                return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['/api/1.1/individual/web', 'no'],db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+                return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['/'+db+'/api/1.1/individual/web', 'no'],db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/lane/<l_id>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/lane/<l_id>/<ext_flag>', methods=['GET'])
 def get_lane_per_lane_id(l_id, ext_flag):
     results=[]
     lane_acc_dic={}
@@ -1612,7 +1656,7 @@ def get_lane_per_lane_id(l_id, ext_flag):
         session['criteria']="lane accession (lane_id)= "+str(lresults[0][-1]) +" ("+str(l_id)+")"
         return redirect(url_for('get_file_per_file_id', f_id=lresults[0][0], ext_flag=ext_flag))
 
-@app.route('/api/1.1/lane/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/lane/<ext_flag>', methods=['GET'])
 def get_lanes(ext_flag):
     lcolumns=get_columns_from_table('lane')
     columns=tuple([lcolumns[1]])+tuple([lcolumns[6]])+tuple([lcolumns[2]])+tuple([lcolumns[3]]) +tuple([lcolumns[6]]) +tuple([lcolumns[7]]) + tuple(["files"])
@@ -1641,7 +1685,7 @@ def get_lanes(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all lanes', url_param=['lane', 0, '/web'], results=[new_column[0], display_results], plus =['all/web','yes'], db=db, log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/lane/all/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/lane/all/<ext_flag>', methods=['GET'])
 def get_lanes_all(ext_flag):
     lcolumns=get_columns_from_table('lane')
     columns=[lcolumns[1]]+[lcolumns[6]]+list(lcolumns[2:6]) + list(lcolumns[7:] +tuple(["files"]))
@@ -1668,9 +1712,9 @@ def get_lanes_all(ext_flag):
             json_results=tuple_to_dic(new_column[0], display_results, "lanes")
             return jsonify(webresults_to_dic(json_results))
         else:
-            return render_template("mysql.html", title='Query was: all lanes', url_param=['lane', 0, '/web'], results=[new_column[0], display_results], plus=['/api/1.1/lane/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+            return render_template("mysql.html", title='Query was: all lanes', url_param=['lane', 0, '/web'], results=[new_column[0], display_results], plus=['/'+db+'/api/1.1/lane/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/location/<loc_id>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/location/<loc_id>/<ext_flag>', methods=['GET'])
 def get_individual_per_location_id(loc_id, ext_flag):
     columns=get_columns_from_table('individual')[1:]
     results=[]
@@ -1695,7 +1739,7 @@ def get_individual_per_location_id(loc_id, ext_flag):
         session['criteria']="location name (location_id)= "+res[0][-1] +" ("+str(loc_id)+")"
         return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
 
-@app.route('/api/1.1/location/<loc_id>/individual/<ind_id>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/location/<loc_id>/individual/<ind_id>/<ext_flag>', methods=['GET'])
 def get_individual_per_id_and_per_location_id(loc_id, ind_id, ext_flag):
     list_loc_id ="("+loc_id+")"
     loc_columns=get_columns_from_table('individual')
@@ -1721,7 +1765,7 @@ def get_individual_per_id_and_per_location_id(loc_id, ind_id, ext_flag):
             flash ("no location associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/location/name/<location>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/location/name/<location>/<ext_flag>', methods=['GET'])
 def get_individual_per_location(location, ext_flag):
     loc_columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
@@ -1746,7 +1790,7 @@ def get_individual_per_location(location, ext_flag):
             flash ("no location associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/location/name/<location>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/location/name/<location>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_name_and_per_location(location, ind_name, ext_flag):
     ind_list=ind_name.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
@@ -1771,7 +1815,7 @@ def get_individual_per_name_and_per_location(location, ind_name, ext_flag):
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/location/name/<location>/sample/name/<sname>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/location/name/<location>/sample/name/<sname>/<ext_flag>', methods=['GET'])
 def get_samples_by_sample_name_and_location(sname, location, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]
@@ -1797,7 +1841,7 @@ def get_samples_by_sample_name_and_location(sname, location, ext_flag):
             flash ("no sample associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/location/name/<location>/species/name/<sp_name>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/location/name/<location>/species/name/<sp_name>/<ext_flag>', methods=['GET'])
 def get_species_per_name_and_per_location(location, sp_name, ext_flag):
     curs = mysql.connection.cursor()
     try:
@@ -1821,7 +1865,7 @@ def get_species_per_name_and_per_location(location, sp_name, ext_flag):
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/location/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/location/<ext_flag>', methods=['GET'])
 def get_location(ext_flag):
     loc_columns=get_columns_from_table('location')
     columns=list(loc_columns)+["species", "individuals"]
@@ -1856,7 +1900,7 @@ def get_location(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all locations', url_param=['location',0, '/web'], results=[columns,results], plus =['.',''], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/material/<m_id>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/material/<m_id>/<ext_flag>', methods=['GET'])
 def get_material_per_material_id(m_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
@@ -1922,9 +1966,9 @@ def get_material_per_material_id(m_id, ext_flag):
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="material name (material_id)= "+mresults[0][3]+" ("+str(m_id)+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['material',  0, '/web' ], results=web_results, plus=['/api/1.1/material/'+m_id+'/all/web','yes'],db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='material')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['material',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/material/'+m_id+'/all/web','yes'],db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='material')
 
-@app.route('/api/1.1/material/<m_id>/all/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/material/<m_id>/all/<ext_flag>', methods=['GET'])
 def get_material_per_material_id_all(m_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
@@ -1988,9 +2032,9 @@ def get_material_per_material_id_all(m_id, ext_flag):
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="material name (material_id)= "+mresults[0][4]+" ("+str(m_id)+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['material',  0, '/web' ], results=web_results, plus=['/api/1.1/material/'+m_id+'/web','no'],db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='material')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['material',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/material/'+m_id+'/web','no'],db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='material')
 
-@app.route('/api/1.1/material/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/material/<ext_flag>', methods=['GET'])
 def get_material(ext_flag):
     scolumns=get_columns_from_table('material')
     columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[9]])+tuple([scolumns[12]])+scolumns[13:14]+tuple(["samples"])
@@ -2021,17 +2065,17 @@ def get_material(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_columns[0], display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/material/all/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/material/all/<ext_flag>', methods=['GET'])
 def get_material_all(ext_flag):
     scolumns=get_columns_from_table('material')
     columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[12]])+scolumns[5:12]+scolumns[13:]+tuple(["samples"])
     curs = mysql.connection.cursor()
     try:
         curs.execute("SELECT distinct m.material_id, m.name, m.individual_id, m.accession, m.developmental_stage_id, m.provider_id, m.date_received, \
-        m.storage_condition, m.storage_location, m.type, m.volume, m.concentration, m.organism_part_id, m.changed, m.latest, \
+        m.storage_condition, m.storage_location, m.type, m.amount, m.unit, m.organism_part_id, m.changed, m.latest, \
         count(distinct s.sample_id) FROM material m join sample s on s.material_id=m.material_id where s.latest=1 and m.latest=1 group by m.material_id, \
         m.name, m.individual_id, m.accession, m.developmental_stage_id, m.provider_id, m.date_received, m.storage_condition, m.storage_location, \
-        m.type, m.volume, m.concentration, m.organism_part_id, m.changed, m.latest")
+        m.type, m.amount, m.unit, m.organism_part_id, m.changed, m.latest")
         results=curs.fetchall()
     except:
         if ext_flag=='json':
@@ -2051,9 +2095,9 @@ def get_material_all(ext_flag):
             json_results=tuple_to_dic(new_columns[0], display_results, "materials")
             return jsonify(webresults_to_dic(json_results))
         else:
-            return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_columns[0], display_results], plus=['/api/1.1/material/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+            return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_columns[0], display_results], plus=['/'+db+'/api/1.1/material/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/project/<p_id>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/project/<p_id>/<ext_flag>', methods=['GET'])
 def get_project_per_project_id(p_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
@@ -2127,9 +2171,9 @@ def get_project_per_project_id(p_id, ext_flag):
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="project name (project_id)= "+presults[0][1]+" ("+p_id+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/api/1.1/project/'+p_id+'/all/web','yes'], db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/project/'+p_id+'/all/web','yes'], db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
 
-@app.route('/api/1.1/project/<p_id>/all/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/project/<p_id>/all/<ext_flag>', methods=['GET'])
 def get_project_per_project_id_all(p_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
@@ -2198,9 +2242,9 @@ def get_project_per_project_id_all(p_id, ext_flag):
     else:
         for_display="project name (project_id)= "+presults[0][1]+" ("+p_id+")"
         session['criteria']=for_display
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/api/1.1/project/'+p_id+'/web','no'], db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/project/'+p_id+'/web','no'], db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
 
-@app.route('/api/1.1/project/name/<accession>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/project/name/<accession>/<ext_flag>', methods=['GET'])
 def get_project_per_accession(accession, ext_flag):
     curs = mysql.connection.cursor()
     try:
@@ -2224,7 +2268,7 @@ def get_project_per_accession(accession, ext_flag):
         else:
             return(redirect(url_for('get_project_per_project_id', p_id=results[0][0], ext_flag=ext_flag)))
 
-@app.route('/api/1.1/project/name/<accession>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/project/name/<accession>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_project_accession_and_name(accession, ind_name, ext_flag):
     result=[]
     ind_list=ind_name.replace(" ","").replace(",", "','")
@@ -2251,7 +2295,7 @@ def get_individual_per_project_accession_and_name(accession, ind_name, ext_flag)
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/project/name/<accession>/location/name/<location>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/project/name/<accession>/location/name/<location>/<ext_flag>', methods=['GET'])
 def get_project_per_accession_and_location(accession, location, ext_flag):
     curs = mysql.connection.cursor()
     try:
@@ -2277,7 +2321,7 @@ def get_project_per_accession_and_location(accession, location, ext_flag):
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/project/name/<accession>/sample/name/<sname>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/project/name/<accession>/sample/name/<sname>/<ext_flag>', methods=['GET'])
 def get_samples_by_sample_name_and_project(sname, accession, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]
@@ -2308,7 +2352,7 @@ def get_samples_by_sample_name_and_project(sname, accession, ext_flag):
             flash ("no project associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/project/name/<accession>/species/name/<sp_name>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/project/name/<accession>/species/name/<sp_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_project_accession_and_species(accession, sp_name, ext_flag):
     results=()
     curs = mysql.connection.cursor()
@@ -2333,7 +2377,7 @@ def get_individual_per_project_accession_and_species(accession, sp_name, ext_fla
             flash ("no project associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/project/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/project/<ext_flag>', methods=['GET'])
 def get_projects(ext_flag):
     columns=get_columns_from_table('project')
     curs = mysql.connection.cursor()
@@ -2362,7 +2406,7 @@ def get_projects(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all projects', url_param=['project', 0, '/web'], results=results, plus=['',''], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/provider/<p_id>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/provider/<p_id>/<ext_flag>', methods=['GET'])
 def get_individual_by_provider(p_id, ext_flag):
     columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
@@ -2386,7 +2430,7 @@ def get_individual_by_provider(p_id, ext_flag):
         session['criteria']="provider name (provider_id)= "+results[0][-1]+" ("+str(p_id)+")"
         return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
 
-@app.route('/api/1.1/provider/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/provider/<ext_flag>', methods=['GET'])
 def get_provider(ext_flag):
     pcolumns=get_columns_from_table('provider')
     columns=pcolumns[:2]+tuple([pcolumns[4]])+tuple(["species", 'individuals'])
@@ -2414,12 +2458,12 @@ def get_provider(ext_flag):
             return jsonify(webresults_to_dic(json_results))
         else:
             if session['logged_in']:
-                return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0, '/web' ], results=[columns,results], plus=['all/web','yes'], db=db, log=session['logged_in'], usrname=session.get('usrname', None))
+                return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0, '/web' ], results=[columns,results], plus=['all/web','yes'], db=db, log=session['logged_in'], usrname=session['usrname'])
             else:
                 flash ("You need to be logged on to see contact details")
-                return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0, '/web' ], results=[columns,results], plus=['/api/1.1/provider/web','yes'], db=db, log=session['logged_in'], usrname=session.get('usrname', None))
+                return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0, '/web' ], results=[columns,results], plus=['/'+db+'/api/1.1/provider/web','yes'], db=db, log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/provider/all/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/provider/all/<ext_flag>', methods=['GET'])
 def get_provider_all(ext_flag):
     pcolumns=get_columns_from_table('provider')
     columns=pcolumns+tuple(["individuals", 'species'])
@@ -2446,9 +2490,9 @@ def get_provider_all(ext_flag):
             json_results=tuple_to_dic(columns, results, "providers")
             return jsonify(webresults_to_dic(json_results))
         else:
-            return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0 , '/web'], results=[columns,results], plus=['/api/1.1/provider/web','no'], db=db, log=1)
+            return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0 , '/web'], results=[columns,results], plus=['/'+db+'/api/1.1/provider/web','no'], db=db, log=1, usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/sample/<s_id>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/sample/<s_id>/<ext_flag>', methods=['GET'])
 def get_sample_per_sample_id(s_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
@@ -2523,9 +2567,9 @@ def get_sample_per_sample_id(s_id, ext_flag):
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="sample name (sample_id)= "+", ".join(list_s_name)+" ("+s_id+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['sample',  0, '/web' ], results=web_results, plus=['/api/1.1/sample/'+s_id+'/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='sample')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['sample',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/sample/'+s_id+'/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='sample')
 
-@app.route('/api/1.1/sample/<s_id>/all/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/sample/<s_id>/all/<ext_flag>', methods=['GET'])
 def get_sample_per_sample_id_all(s_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
@@ -2596,9 +2640,9 @@ def get_sample_per_sample_id_all(s_id, ext_flag):
         return jsonify(webresults_to_dic(json_results))
     else:
         for_display="sample name (sample_id)= "+", ".join(list_s_name)+" ("+s_id+")"
-        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['sample',  0, '/web' ], results=web_results, plus=['/api/1.1/sample/'+s_id+'/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='sample')
+        return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['sample',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/sample/'+s_id+'/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='sample')
 
-@app.route('/api/1.1/sample/name/<sname>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/sample/name/<sname>/<ext_flag>', methods=['GET'])
 def get_samples_by_name(sname, ext_flag):
     s_list=sname.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
@@ -2624,7 +2668,7 @@ def get_samples_by_name(sname, ext_flag):
         else:
             return(redirect(url_for('get_sample_per_sample_id', s_id=list_sample_id, ext_flag=ext_flag)))
 
-@app.route('/api/1.1/sample/name/<sname>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/sample/name/<sname>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_samples_by_sample_name_and_individual_name(sname, ind_name, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     ind_list=ind_name.replace(" ","").replace(",", "','")
@@ -2653,7 +2697,7 @@ def get_samples_by_sample_name_and_individual_name(sname, ind_name, ext_flag):
         else:
             return(redirect(url_for('get_sample_per_sample_id', s_id=list_sample_id, ext_flag=ext_flag)))
 
-@app.route('/api/1.1/sample/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/sample/<ext_flag>', methods=['GET'])
 def get_samples(ext_flag):
     results=[]
     scolumns=get_columns_from_table('sample')
@@ -2698,7 +2742,7 @@ def get_samples(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all samples', url_param=['sample', 0, '/web'], results=[new_columns[0],display_results], plus=['',''], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/species/<sp_id>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/species/<sp_id>/<ext_flag>', methods=['GET'])
 def get_species_per_species_id(sp_id, ext_flag):
     columns=get_columns_from_table('individual')[1:8]
     results=[]
@@ -2725,7 +2769,7 @@ def get_species_per_species_id(sp_id, ext_flag):
         session['criteria']="species name (species_id)= "+sresults[0][-1]+" ("+str(sp_id)+")"
         return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
 
-@app.route('/api/1.1/species/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/species/<ext_flag>', methods=['GET'])
 def get_species(ext_flag):
     scolumns=get_columns_from_table('species')
     columns=scolumns[1:6]+tuple([scolumns[9]])+tuple(["individuals"])
@@ -2756,7 +2800,7 @@ def get_species(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all species', url_param=['species',0, '/web'], results=[new_columns[0], display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/species/all/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/species/all/<ext_flag>', methods=['GET'])
 def get_species_all(ext_flag):
     scolumns=get_columns_from_table('species')
     columns=scolumns[1:]+tuple(["individuals"])
@@ -2787,9 +2831,9 @@ def get_species_all(ext_flag):
             json_results=tuple_to_dic(tuple(new_columns[0]), display_results, "species")
             return jsonify(webresults_to_dic(json_results))
         else:
-            return render_template("mysql.html", title='Query was: all species', url_param=['species',0, '/web'], results=[new_columns[0], display_results], plus=['/api/1.1/species/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+            return render_template("mysql.html", title='Query was: all species', url_param=['species',0, '/web'], results=[new_columns[0], display_results], plus=['/'+db+'/api/1.1/species/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/api/1.1/species/name/<sp_name>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/species/name/<sp_name>/<ext_flag>', methods=['GET'])
 def get_species_per_name(sp_name, ext_flag):
     list_species_id=""
     scolumns=get_columns_from_table('species')
@@ -2817,7 +2861,7 @@ def get_species_per_name(sp_name, ext_flag):
             flash ("no species associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/species/name/<sp_name>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/species/name/<sp_name>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_name_and_species_name(ind_name, sp_name, ext_flag):
     ind_list=ind_name.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
@@ -2840,7 +2884,7 @@ def get_individual_per_name_and_species_name(ind_name, sp_name, ext_flag):
             flash ("no species associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/api/1.1/species/name/<sp_name>/sample/name/<sname>/<ext_flag>', methods=['GET'])
+@app.route('/'+db+'/api/1.1/species/name/<sp_name>/sample/name/<sname>/<ext_flag>', methods=['GET'])
 def get_samples_by_sample_name_and_species(sname, sp_name, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]
