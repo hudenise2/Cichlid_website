@@ -41,7 +41,7 @@ login = LoginManager(app)
 app.config.update(mail_settings)
 mail = Mail(app)
 login.login_view = 'login'
-mail.init_app(app)
+#mail.init_app(app)
 session={}
 session['logged_in']=0
 db='cichlid'
@@ -146,6 +146,7 @@ def change_for_display(col, data, ext_flag):
     list_old_data=[]
     list_new_data=[]
     list_new_columns=[]
+    maxThumbnail=0
     #dictionary with 'table' name as key and name/attribute(s) values
     table_dic={'assembly':'name', 'cv':'attribute, comment', 'developmental_stage':'name', 'family':'name', 'file':'name',
     'image':'filename', 'individual':'name', 'lane':'name', 'library':'ssid', 'library_type':'name',
@@ -226,7 +227,6 @@ def change_for_display(col, data, ext_flag):
                         flash ("Error: unable to fetch items: "+"SELECT "+table_dic[table_name_dic[dic_index]]+ " FROM "+table_name_dic[dic_index]+" WHERE "+table_name_dic[dic_index]+"_id = '{id}';". format(id=row[dic_index]))
                 curs.close()
         #section to add data in correct field when several fields are returned
-
         #if species field (species_name) in column:
         if 'species_name' in column:
             if row[column.index('species_name')] is None:
@@ -263,7 +263,7 @@ def change_for_display(col, data, ext_flag):
         if column[0]=='individual_id':
             column[1]="supplier_name"
             curs = mysql.connection.cursor()
-            curs.execute("SELECT filepath, filename FROM image WHERE individual_id= '{id}';". format(id=row[0]))
+            curs.execute("SELECT filepath, filename FROM image WHERE latest=1 and individual_id= '{id}';". format(id=row[0]))
             image_results=curs.fetchall()
             curs.close()
             if 'thumbnail' not in column:
@@ -275,6 +275,8 @@ def change_for_display(col, data, ext_flag):
                     #required to match column and data length
                     if image_index > 0:
                         column.append('thumbnail')
+                    #get the higher number of thumbnails to ensure proper display
+                    maxThumbnail=max(maxThumbnail,column.count("thumbnail"))
             else:
                 row.append('')
         #get the updated columns and data in a list
@@ -283,6 +285,10 @@ def change_for_display(col, data, ext_flag):
         #if there is more than one entry for an individual, order by latest and reverse date
         if column[0]=='individual_id' and len(column) > 13:
             list_new_data = reorder_for_vertical_display(list_new_data)
+    #The number of thumbnail to display is taken from the column entry in the list_new_column. So ensure the length is the maximum of thumbnails to display
+    if column[0]=="individual_id":
+        for i in range(0, maxThumbnail-list_new_columns[0].count("thumbnail")):
+            list_new_columns[0].append("thumbnail")
     return tuple(list_new_columns), tuple(list_new_data)
 
 def check_data(table, dic, criteria):
@@ -636,6 +642,14 @@ def upload(file, usrname):
         #if upload successful: remove the tmp file
         os.remove(TMPPATH+file)
         session['usrname']=usrname
+        '''
+        with app.app_context():
+            msg = Message(subject="new upload from website",
+                sender=app.config.get("MAIL_USERNAME"),
+                recipients=['had38@cam.ac.uk'], #app.config.get("MAIL_USERNAME") replace with your email for testing
+                body="File uploaded: "+OUTPATH+"file_upload_"+today+suffix+"_"+usrname+".tsv")
+            mail.send(msg)
+        '''
         flash ('file uploaded successfully')
         return redirect(url_for('enter_data'))
     else:
@@ -859,9 +873,9 @@ def enter_data():
     #provider_list.append("-choose providers-")
     if request.method == "POST" :
         #save file in a temp folder if re-uploading a fill template
+        results=request.form
         if request.form['Sform'] == 'submit':
             session['usrname']=usrname
-            results=request.form
             upload_file=request.files['file']
             if upload_file.filename=="":
                 session['usrname']=usrname
@@ -873,9 +887,9 @@ def enter_data():
                 upload(upload_name, usrname)
         else:
             #write data onto a tab separated file if filling the form
-            results=request.form
             session['usrname']=usrname
-            if 'Download' in results:
+            # if 'Download' in results:
+            if request.form['Sform'] == 'downl':
                 return redirect(url_for('download'))
             elif 'Sform' in results:
                 write_flag=write_data(results, usrname)
@@ -1108,7 +1122,7 @@ def register():
                         flash("Thanks for registering!")
                         return redirect(url_for('login'))
                     else:
-                        msg = Message(body='username: '+username+'\nemail: '+email+'\npassword: '+password, subject = 'New registration', sender ='had38@cam.ac.uk', recipients = ['had38@cam.ac.uk'])
+                        msg = Message(body='username: '+username+'\nemail: '+email+'\npassword: '+password, subject = 'New registration', sender ='hudenise2@gmail.com', recipients = ['had38@cam.ac.uk'])
                         mail.send(msg)
                         return redirect(url_for('index'))
                         flash("Thanks for registering: your registration is now pending approval")
