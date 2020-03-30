@@ -48,6 +48,58 @@ db='darwin'
 today=time.strftime("%Y-%m-%d")
 time_stamp=time.strftime("%Y-%m-%d-%H-%M-%S")
 ################### DATA PROCESSING FUNCTIONS ##################################
+def add_annotations(results_dic, header_dic, ext_flag):
+    annot_results=[]
+    curs = mysql.connection.cursor()
+    for main_id in results_dic:
+        #get the tables
+        for table in results_dic[main_id]:
+            #transform data onto list
+            list_data=[x for x in list(results_dic[main_id][table])]
+            #get the identifier for each table entry
+            list_identifier=[x[1] for x in list_data]
+            #
+            check_list=[x for x in list_identifier if str(x).isdigit()]
+            if len(check_list) != len(list_identifier):
+                list_identifier=[x[0] for x in list_data]
+            for id in list_identifier:
+                annot_col=""
+                annot_data=""
+                #check if annotations are present in the database for this entry
+                try:
+                    curs.execute("Select distinct * from annotations where table_name = '"+table+"' and table_id = "+str(id))
+                    annot_results=curs.fetchall()
+                except:
+                    if ext_flag=='json':
+                        return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+                    else:
+                        flash ("Error: unable to fetch annotations information")
+                if len(annot_results) > 0:
+                    #get cv_id for each entry and check how it has to be displayed (no need to display if not informative)
+                    for annotation in annot_results:
+                        try:
+                            curs.execute("Select attribute, comment from cv where cv_id = "+str(annotation[2]))
+                            cv_results=curs.fetchall()
+                        except:
+                            if ext_flag=='json':
+                                return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+                            else:
+                                flash ("Error: unable to fetch cv information")
+                        if len(cv_results) > 0:
+                            annot_col=cv_results[0][0]
+                            annot_data=",".join([x for x in annotation[-2:] if x is not None])
+                        if header_dic[table][-1] != annot_col:
+                            header_dic[table]=tuple(list(header_dic[table])+[annot_col])
+                        #add the annotation to each entry
+                        list_data[list_identifier.index(id)]=list(list_data[list_identifier.index(id)])+[annot_data]
+            results_dic[main_id][table]=list_data
+    #ensure that all table entry have the same length (required for correct display)
+    for entry_id in results_dic:
+        for table in results_dic[entry_id]:
+            for entry_index in range(len(results_dic[entry_id][table])):
+                results_dic[entry_id][table][entry_index]=tuple(list(results_dic[entry_id][table][entry_index])+list((len(header_dic[table])-len(results_dic[entry_id][table][entry_index]))*" "))
+    return results_dic, header_dic
+
 def add_individual_data_info(col, data):
     """adding individual_data information if available to 'individual' display"""
     '''
@@ -271,10 +323,11 @@ def change_for_display(col, data, ext_flag):
             if image_results and 'samples' not in column:
                 for image_index in range(0, len(image_results)):
                     #create path to image file
-                    row.append("/".join(list(image_results[image_index])))
-                    #required to match column and data length
-                    if image_index > 0:
-                        column.append('thumbnail')
+                    if image_results[image_index][0] is not None:
+                        row.append("/".join(list(image_results[image_index])))
+                        #required to match column and data length
+                        if image_index > 0:
+                            column.append('thumbnail')
                     #get the higher number of thumbnails to ensure proper display
                     maxThumbnail=max(maxThumbnail,column.count("thumbnail"))
             else:
@@ -1271,6 +1324,7 @@ def get_file_per_file_id_all(f_id, ext_flag):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     file_results[f_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
+    file_results, col_dic= add_annotations(file_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(file_results, col_dic, ext_flag, "file")
     if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
@@ -1333,7 +1387,10 @@ def get_images(ext_flag):
             flash ("Error: no image data available in the database '"+db+"'")
             return redirect(url_for('index'))
     for row in img_results:
-        i_results=[row[0]]+[row[1]]+[row[2]]+list([row[3]+"/"+row[2]])+[row[4]]
+        if row[2] is not None:
+            i_results=[row[0]]+[row[1]]+[row[2]]+list([row[3]+"/"+row[2]])+[row[4]]
+        else:
+            i_results=[row[0]]+[row[1]]+['--', '--']+[row[4]]
         results.append(tuple(i_results))
     new_column, display_results= change_for_display([columns], results, ext_flag)
     if ext_flag=='json':
@@ -1367,7 +1424,10 @@ def get_images_all(ext_flag):
             return redirect(url_for('index'))
     else:
         for row in img_results:
-            i_results=[row[0]]+[row[1]]+[row[2]]+list([row[3]+"/"+row[2]])+list(row[3:])
+            if row[2] is not None:
+                i_results=[row[0]]+[row[1]]+[row[2]]+list([row[3]+"/"+row[2]])+list(row[3:])
+            else:
+                i_results=[row[0]]+[row[1]]+['--', '--', '--']+list(row[4:])
             results.append(tuple(i_results))
         new_column, display_results= change_for_display([columns], results, ext_flag)
         if ext_flag=='json':
@@ -1533,6 +1593,7 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
         individual_results[individual_id]=table_dic
     curs.close()
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
+    individual_results, col_dic = add_annotations(individual_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(individual_results, col_dic, ext_flag, "individual")
     if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
@@ -1767,8 +1828,8 @@ def get_individual_per_id_and_per_location_id(loc_id, ind_id, ext_flag):
         if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
-            flash ("Error: unable to fetch location and / or individual")
-    curs.close
+            flash ("Erro(r: unable to fetch location and / or individual")
+    curs.close()
     if len(lresults) > 0:
         results="("+",".join([str(x[0]) for x in lresults])+")"
         return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
@@ -2041,6 +2102,7 @@ def get_material_per_material_id_all(m_id, ext_flag):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     material_results[m_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
+    material_results, col_dic = add_annotations(material_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(material_results, col_dic, ext_flag, "material")
     if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
@@ -2105,11 +2167,13 @@ def get_material_all(ext_flag):
             return redirect(url_for('index'))
     else:
         new_columns, display_results= change_for_display([columns], list(results), ext_flag)
+        #add annotations: re-format the data onto 'fake' dictionaries to use fonction and keep unique header entries.
+        display_results_dic, new_column_dic = add_annotations({"fake_dict": {"material":display_results}}, {'material': [x for x in set(tuple(y) for y in new_columns)][0]}, ext_flag)
         if ext_flag=='json':
-            json_results=tuple_to_dic(new_columns[0], display_results, "materials")
+            json_results=tuple_to_dic(list(new_column_dic["material"]), display_results_dic["fake_dict"]["material"], "materials")
             return jsonify(webresults_to_dic(json_results))
         else:
-            return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_columns[0], display_results], plus=['/'+db+'/api/1.1/material/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+            return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_column_dic["material"], display_results_dic["test"]["material"]], plus=['/'+db+'/api/1.1/material/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
 @app.route('/'+db+'/api/1.1/project/<p_id>/<ext_flag>', methods=['GET'])
 def get_project_per_project_id(p_id, ext_flag):
@@ -2250,6 +2314,7 @@ def get_project_per_project_id_all(p_id, ext_flag):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     project_results[p_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
+    project_results, col_dic = add_annotations(project_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(project_results, col_dic, ext_flag, "project")
     if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
@@ -2649,6 +2714,7 @@ def get_sample_per_sample_id_all(s_id, ext_flag):
         sample_results[sample_id]=table_dic
     curs.close()
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
+    sample_results, col_dic = add_annotations(sample_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(sample_results, col_dic, ext_flag, "sample")
     if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
@@ -2754,7 +2820,7 @@ def get_samples(ext_flag):
             json_results=tuple_to_dic(tuple(new_columns[0]), display_results, "samples")
             return jsonify(webresults_to_dic(json_results))
         else:
-            return render_template("mysql.html", title='Query was: all samples', url_param=['sample', 0, '/web'], results=[new_columns[0],display_results], plus=['',''], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+            return render_template("mysql.html", title='Query was: all samples', url_param=['sample', 0, '/web'], results=[new_columns[0],display_results], plus=['all/web','yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
 @app.route('/'+db+'/api/1.1/species/<sp_id>/<ext_flag>', methods=['GET'])
 def get_species_per_species_id(sp_id, ext_flag):
