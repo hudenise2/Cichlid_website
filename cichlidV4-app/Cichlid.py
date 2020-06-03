@@ -15,7 +15,7 @@ from config import Config
 app = Flask(__name__)
 
 '''
-    Website script written by H. Denise (Cambridge Uni) 31/01/2020
+    Website script written by H. Denise (Cambridge Uni) 31/06/2020
     Script for the Cichlid database
 '''
 #initialisation of connection
@@ -49,6 +49,14 @@ today=time.strftime("%Y-%m-%d")
 time_stamp=time.strftime("%Y-%m-%d-%H-%M-%S")
 ################### DATA PROCESSING FUNCTIONS ##################################
 def add_annotations(results_dic, header_dic, ext_flag):
+    """    add annotations information for other tables than individual"""
+    '''
+    input results_dic: dictionary of data to display with identifier as key and table data as value (dic)
+    input header_dic: dictionary of column_header for each table (dic)
+    input ext_flag: suffix for the data (web for web display, json to download) (str)
+    return results_dic: as input with annotation(s) inserted
+    return header_dic: as input with header(s) relevant to the annotation(s) inserted
+    '''
     annot_results=[]
     curs = mysql.connection.cursor()
     for main_id in results_dic:
@@ -100,33 +108,87 @@ def add_annotations(results_dic, header_dic, ext_flag):
                 results_dic[entry_id][table][entry_index]=tuple(list(results_dic[entry_id][table][entry_index])+list((len(header_dic[table])-len(results_dic[entry_id][table][entry_index]))*" "))
     return results_dic, header_dic
 
-def add_individual_data_info(col, data):
+def add_individual_data_info(results_dic, header_dic, ext_flag):
     """adding individual_data information if available to 'individual' display"""
     '''
-    input col: field headers for individual (now including project and sample fields) (tuple)
-    input data: data for the individual (see add_sample_info) (tuple)
-    return new_col: field headers with individual_data fields added (tuple)
-    return new_data: data for the individual with individual_data info added, if present, in the database (tuple)
+    input results_dic: dictionary of data to display with identifier as key and table data as value (dic)
+    input header_dic: dictionary of column_header for each table (dic)
+    input ext_flag: suffix for the data (web for web display, json to download) (str)
+    return individual_data_results: as results_dic input with individual_data inserted
+    return header_dic: as input with header(s) relevant to the individual data inserted
     '''
-    new_col=col
-    new_data=data
-    curs=mysql.connection.cursor()
-    if len(data) > 0:
-        try:
-            curs.execute("SELECT distinct * from individual_data where latest=1 and individual_id = '{indi}';". format(indi=data[0]))
-            id_results=curs.fetchall()
-        except:
-            if ext_flag=='json':
-                return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
-            else:
-                flash ("Error: unable to fetch individual_data information")
-        if len(id_results) > 0:
-            #to cope with case when there is more than one individual_data associated with the individual
-            for id_result in id_results:
-                new_col+=tuple(["cv_id","value","unit", "comment"])
-                new_data+=tuple(list(id_result[2:6]))
-    curs.close()
-    return new_col, new_data
+    individual_data_results={}
+    curs = mysql.connection.cursor()
+    header_list={}
+    cv_equivalence={}
+    individual_data_headers=[]
+    used_pos=[]
+    #get the cv_id, cv_attribute data as dictionary
+    try:
+        curs.execute("Select cv_id, attribute, comment from cv") #where cv_id=3 where comment not in ('entry for table sample', 'entry for table file', 'entry for table material') ")
+        cv_results=curs.fetchall()
+    except:
+        if ext_flag=='json':
+            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+        else:
+            flash ("Error: unable to fetch cv information")
+    cv_equivalence={attribute[0]:attribute[1] for attribute in cv_results if attribute[2] not in ('entry for table sample', 'entry for table file', 'entry for table material')}
+    key_list=sorted(list(cv_equivalence.keys()))
+    inverted_cv_equivalence={v:k for k,v in cv_equivalence.items()}
+    #create updated header list
+    for x in range(len(key_list)):
+        individual_data_headers.append(cv_equivalence[key_list[x]])
+        if cv_equivalence[key_list[x]]=='weight': individual_data_headers.append('unit')
+        individual_data_headers.append('comment')
+    #generate dictionary of keys and position in the list of individual data annotations that will be created for each entry
+    key_pos_dic={x:individual_data_headers.index(cv_equivalence[x]) for x in key_list }
+    original_header_length=len(header_dic['individual'])
+    header_dic['individual']=tuple(list(header_dic['individual'])+individual_data_headers)
+    #go through the input data dictionary
+    for main_id in results_dic:
+        #transform values for each table onto a list instead of a tuple (list can be updated, tuple cannot)
+        individual_data_results[main_id]={x:list(y) for x,y in results_dic[main_id].items()}
+        #get the data for the table individual
+        individual_entries=list(results_dic[main_id]['individual'])
+        #transform the individual data onto lists
+        list_data=[list(x) for x in individual_entries]
+        for individual_entry in list_data:
+            entry_index=list_data.index(individual_entry)
+            #get the individual_id
+            identifier=individual_entry[1]
+            #check if individual_data are present in the database for this entry
+            try:
+                curs.execute("Select distinct * from individual_data where latest=1 and individual_id = "+str(identifier))
+                ind_data_table_results=curs.fetchall()
+            except:
+                if ext_flag=='json':
+                    return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+                else:
+                    flash ("Error: unable to fetch individual_data information")
+            if len(ind_data_table_results) > 0:
+                #prepare list with empty elements. They will each correspond to a category value (note weight has 2 attributes (value, unit) in addition to the comment)
+                individual_data_entry=['']*((len(cv_equivalence)*2)+1)
+                #get cv_id for each entry and check how it has to be displayed (no need to display if not informative)
+                for ind_data in ind_data_table_results:
+                    cv_value=ind_data[2]
+                    individual_data_entry[key_pos_dic[cv_value]]=ind_data[3] #value
+                    used_pos.append(key_pos_dic[cv_value]+original_header_length)
+                    if cv_value != inverted_cv_equivalence['weight']:
+                        individual_data_entry[key_pos_dic[cv_value]+1]=ind_data[5] #comment
+                        if ind_data[5] !="" and ind_data[5] is not None: used_pos.append(key_pos_dic[cv_value]+1+original_header_length)
+                    else:
+                        individual_data_entry[key_pos_dic[cv_value]+1]=ind_data[4] #unit
+                        used_pos.append(key_pos_dic[cv_value]+1+original_header_length)
+                        individual_data_entry[key_pos_dic[cv_value]+2]=ind_data[5] #comment
+                        if ind_data[5] !="" and ind_data[5] is not None: used_pos.append(key_pos_dic[cv_value]+2+original_header_length)
+                individual_entry+=individual_data_entry
+            individual_data_results[main_id]['individual'][entry_index]=individual_entry
+    #'clean' the data before returning them by removing the 'empty'
+    for main_id in individual_data_results:
+        for j in range(len(individual_data_results[main_id]['individual'])):
+            individual_data_results[main_id]['individual'][j]=[individual_data_results[main_id]['individual'][j][x] for x in range(len(individual_data_results[main_id]['individual'][j])) if x < original_header_length or x in used_pos]
+    header_dic['individual']=[header_dic['individual'][x] for x in range(len(header_dic['individual'])) if x< original_header_length or x in used_pos]
+    return individual_data_results, header_dic
 
 def add_project_info(col, data):
     """adding project information, if available, to 'individual' vertical display"""
@@ -768,19 +830,26 @@ def write_data(usr_data, usrname):
     input usr_data: list of tuple collecting the data entered onto the form on the upload page
     return call to enter_data page
     '''
-    full_column_list=['option', 'individual_name', 'alias', 'sex', 'species_name', 'taxon_id', 'common_name', 'taxon_position', 'date_collected', 'collection_method', 'collection_details',
-     'collector_name', 'country', 'location', 'location_details', 'latitude', 'longitude', 'developmental_name', 'individual_weight', 'unit', 'organism_part', 'individual_comment', 'image_name',
-     'image_path', 'image_comment', 'image_licence', 'material_name', 'material_accession', 'material_type', 'date_received', 'storage_condition', 'material_location',
-     'material_amount', 'material_unit', 'material_comment', 'material_provider_name', 'project_name', 'project_alias', 'project_ssid', 'project_accession', 'sample_name', 'sample_accession',
-     'sample_ssid', 'sample_comment', 'lane_name', 'lane_accession', 'library_name', 'library_ssid', 'file_name', 'file_accession', 'format', 'paired-end', 'md5', 'filepath', 'file_comment',
-     'nber_reads', 'seq_centre', 'seq_tech']
-    form_column_dic={'Option':0, 'ind_name':1, 'ind_alias':2, 'Gender':3, 'dev_stage':17, 'ind_comment':21, 'sp_name':4, 'sp_cname':6, 'sp_taxid':5, 'sp_taxpos':7, 'provname':11,
-     'pv_name':11, 'mat_name':26, 'mat_acc':27, 'mat_type':28, 'mat_part':20, 'mat_cond':30, 'mat_location':31, 'mat_wgt':32, 'mat_unit':33, 'mat_received':29,
-     'mat_comment':34, 'mat_provider':35,'loc_country':12, 'loc_region':13, 'loc_details':14, 'loc_lat':15, 'loc_lng':16, 'loc_method':9, 'loc_weight':18, 'loc_unit':19, 'loc_collected':8, 'prj_name':36,
-     'prj_alias':37, 'prj_acc':39, 'prj_ssid':38, 'spl_name':40, 'spl_accession':41, 'spl_ssid':42, 'spl_comment':43, 'lane_name':44, 'lane_accession':45, 'lib_name':46, 'lib_ssid':46,
-     'file_name':48, 'file_accession':49, 'file_format':50, 'file_PE':51, 'file_reads':55, 'file_md5':52, 'file_path':53, 'file_comment':54, 'seq_tech':57, 'seq_centre':56, 'img_name':22,
-     'img_source':23, 'img_comment':24, 'img_licence':25}
-    annotations_table_dic={'ext': 'material', 'col': 'individual', 'stg': 'material', 'seq': 'sample'}
+    full_column_list=['option', 'individual_name', 'alias', 'species_name', 'genus', 'species', 'informal', 'taxon_id', 'common_name',
+     'taxon_position', 'date_collected', 'collection_method', 'collection_details', 'collector_name', 'country', 'location',
+     'location_details', 'latitude', 'longitude', 'sex', 'developmental_name', 'individual_weight', 'unit', 'individual_comment',
+     'clade', 'species_subset', 'material_name', 'material_accession', 'organism_part', 'material_type', 'storage_condition',
+     'material_location', 'material_amount', 'material_unit', 'material_provider_name', 'material_comment', 'date_received',
+     'image_name', 'image_path', 'image_comment', 'image_licence', 'project_name', 'project_alias', 'project_ssid', 'project_accession',
+     'sample_name', 'sample_accession', 'sample_ssid', 'sample_comment', 'lane_name', 'lane_accession', 'library_name', 'library_ssid',
+     'seq_centre', 'seq_tech', 'paired-end', 'file_name', 'format', 'file_accession', 'md5', 'filepath', 'nber_reads', 'total_length',
+     'average_length', 'sequence_depth', 'exclusion_code', 'file_comment']
+
+    form_column_dic={'option': 0, 'ind_name': 1, 'ind_alias': 2, 'sp_name': 3, 'sp_genus': 4, 'sp_species': 5, 'sp_informal': 6, 'sp_taxid': 7,
+     'sp_cname': 8, 'sp_taxpos': 9, 'ind_collected': 10, 'coll_method': 11, 'coll_details': 12, 'iprovname': 13, 'loc_country': 14, 'loc_region': 15,
+     'loc_details': 16, 'loc_lat': 17, 'loc_lng': 18, 'gender': 19, 'dev_stage': 20, 'coll_weight': 21, 'coll_unit': 22, 'ind_comment' : 23, 'sp_clade': 24,
+     'sp_subset': 25, 'mat_name': 26, 'mat_acc': 27, 'mat_part': 28, 'mat_type': 29, 'mat_cond': 30, 'mat_location': 31, 'mat_wgt': 32, 'mat_unit': 33,
+     'mprovname': 34, 'mat_comment': 35, 'mat_received': 36, 'img_name': 37, 'img_source': 38, 'img_comment': 39, 'img_licence': 40, 'prj_name': 41,
+     'prj_alias': 42, 'prj_ssid': 43, 'prj_acc': 44, 'spl_name': 45, 'spl_accession': 46, 'spl_ssid': 47, 'spl_comment': 48, 'lane_name': 49,
+     'lane_accession': 50, 'lib_name': 51, 'lib_ssid': 52, 'seq_centre': 53, 'seq_tech': 54, 'file_PE': 55, 'file_name': 56, 'file_format': 57,
+     'file_accession': 58, 'file_md5': 59, 'file_path': 60, 'file_reads': 61, 'file_total': 62, 'file_average': 63, 'file_depth': 64,
+     'file_exclusion': 65, 'file_comment': 66}
+    annotations_table_dic={'ext': 'material', 'col': 'individual', 'stg': 'material', 'seq': 'sample', 'pro': 'sample'}
     annotations_dic={}
     provider_dic={}
     header_submission=[]
@@ -796,14 +865,15 @@ def write_data(usr_data, usrname):
                 if len(usr_data[header]) > 0:
                     annotations_dic[header]= usr_data[header]
             #case where provider info is provided
-            elif header in ['pv_name', 'pv_fname', 'pv_mail', 'pv_phone', 'pv_address']:
+            elif header in ['pprovname', 'pv_name', 'pv_fname', 'pv_mail', 'pv_phone', 'pv_address']:
                 if len(usr_data[header]) > 0:
                      provider_dic[header]=usr_data[header]
             else:
-                #group mat location and mat loca position (2 fields in the entry page)
+                #group mat location and mat location position (2 fields in the entry page, 1 field in the template)
                 if header == "mat_loc_pos":
                     if  len(str(usr_data["mat_loc_pos"])) != 0:
                         data_submitted[form_column_dic["mat_location"]]+=", "+str(usr_data["mat_loc_pos"])
+                        if data_submitted[form_column_dic["mat_location"]].startswith(", "): data_submitted[form_column_dic["mat_location"]]=data_submitted[form_column_dic["mat_location"]][2:]
                 else:
                     data_submitted[form_column_dic[header]]=usr_data[header]
     #Check that the individual name field is present as it is the only compulsory field
@@ -816,16 +886,24 @@ def write_data(usr_data, usrname):
             #get which table the comment should be associated with
             ann_table = annotations_table_dic[annotations_dic['ann_cat']]
             annotations_dic['value']=annotations_dic['ann_ann']
-            annotations_dic['comment']=annotations_dic['ann_comment']
+            if 'ann_comment' in annotations_dic: annotations_dic['comment']=annotations_dic['ann_comment']
+            #if the table is defined
             if annotations_dic['ann_ann'] != "":
             #if comment already listed in header list, add to data in data_submitted
                 index_field=full_column_list.index(ann_table+"_comment")
-                if data_submitted[index_field]=="":
-                    data_submitted[index_field]=annotations_dic['ann_ann'] + " ("+annotations_dic['ann_comment']+")"
+                if len(data_submitted[index_field])==0:
+                    if 'ann_comment' in annotations_dic:
+                        data_submitted[index_field]=annotations_dic['ann_ann'] + " ("+annotations_dic['ann_comment']+")"
+                    else:
+                        data_submitted[index_field]=annotations_dic['ann_ann']
                 else:
-                    data_submitted[index_field]+="; "+annotations_dic['ann_ann'] + " ("+annotations_dic['ann_comment']+")"
+                    if 'ann_comment' in annotations_dic:
+                        data_submitted[index_field]+="; "+annotations_dic['ann_ann'] + " ("+annotations_dic['ann_comment']+")"
+                    else:
+                        data_submitted[index_field]+="; "+annotations_dic['ann_ann']
         issues=[]
-        if len(provider_dic)>0:
+        #separate to another function?
+        if provider_dic != {'pprovname': '-select-'}:
             if 'pv_name' not in provider_dic:
                 flash("-  The provider name is an essential field for the provider section")
                 session['usrname']=usrname
@@ -900,8 +978,8 @@ def verify_password(stored_password, provided_password):
 @app.route('/'+db+'/api/1.1/download', methods=['GET', 'POST'])
 def download():
     """function to provide the csv template to enter data"""
-    return send_file("entry.tsv",
-        mimetype="text/tsv", attachment_filename='entry.tsv', as_attachment=True)
+    return send_file("template_entry.tsv",
+        mimetype="text/tsv", attachment_filename='template_entry.tsv', as_attachment=True)
 
 @app.route('/'+db+'/api/1.1/enter_data', methods=['GET', 'POST'])
 def enter_data():
@@ -1523,9 +1601,9 @@ def get_individual_per_individual_id(i_id, ext_flag):
 @app.route('/'+db+'/api/1.1/individual/<i_id>/all/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_id_all(i_id, ext_flag):
     pcolumns=get_columns_from_table('project')
-    ind_columns=get_columns_from_table('individual')
-    ind_id_columns=get_columns_from_table('individual_data')
-    icolumns=ind_columns[:12]+ind_id_columns[2:6]+ind_columns[12:]
+    icolumns=get_columns_from_table('individual')
+    #ind_id_columns=get_columns_from_table('individual_data')
+    #icolumns=ind_columns[:12]+ind_id_columns[2:6]+ind_columns[12:]
     mcolumns=get_columns_from_table('material')
     scolumns=get_columns_from_table('sample')
     fcolumns=get_columns_from_table('file')
@@ -1552,9 +1630,7 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
         try:
             curs.execute("select distinct i.row_id, i.individual_id, i.name, i.alias, i.species_id, i.sex, \
             i.accession, i.location_id, i.provider_id, i.date_collected, i.collection_method, i.collection_details, \
-            id.cv_id, id.value, id.unit, id.comment, i.father_id, i.mother_id, i.changed, i.latest FROM individual i \
-            left join individual_data id on i.individual_id=id.individual_id \
-            where i.latest=1 and i.individual_id = %s" % individual_id)
+            i.father_id, i.mother_id, i.changed, i.latest FROM individual i where i.latest=1 and i.individual_id = %s" % individual_id)
             iresults=curs.fetchall()
         except:
             if ext_flag=='json':
@@ -1593,6 +1669,7 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
         individual_results[individual_id]=table_dic
     curs.close()
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
+    individual_results, col_dic = add_individual_data_info(individual_results, col_dic, ext_flag)
     individual_results, col_dic = add_annotations(individual_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(individual_results, col_dic, ext_flag, "individual")
     if ext_flag=='json':
@@ -2102,6 +2179,7 @@ def get_material_per_material_id_all(m_id, ext_flag):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     material_results[m_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
+    material_results, col_dic =add_individual_data_info(material_results, col_dic, ext_flag)
     material_results, col_dic = add_annotations(material_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(material_results, col_dic, ext_flag, "material")
     if ext_flag=='json':
@@ -2314,6 +2392,7 @@ def get_project_per_project_id_all(p_id, ext_flag):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     project_results[p_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
+    project_results, col_dic =add_individual_data_info(project_results, col_dic, ext_flag)
     project_results, col_dic = add_annotations(project_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(project_results, col_dic, ext_flag, "project")
     if ext_flag=='json':
@@ -2714,6 +2793,7 @@ def get_sample_per_sample_id_all(s_id, ext_flag):
         sample_results[sample_id]=table_dic
     curs.close()
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
+    sample_results, col_dic =add_individual_data_info(sample_results, col_dic, ext_flag)
     sample_results, col_dic = add_annotations(sample_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(sample_results, col_dic, ext_flag, "sample")
     if ext_flag=='json':
