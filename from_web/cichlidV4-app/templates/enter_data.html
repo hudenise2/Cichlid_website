@@ -65,7 +65,7 @@ function myFunction() {
         <h3 style="margin-left: 40px" >or fill this form:</h3>
     <div>
       <form action="{{ url_for('enter_data') }}" method="post" autocomplete="off" value="fill" >
-    {{ form.option.label }} {{ form.option}}
+    {{ form.Option.label }} {{ form.Option}}
     <p></p>
     <fieldset>
       <legend><b> Individual</b> information</legend>
@@ -79,7 +79,7 @@ function myFunction() {
             {{ form.ind_alias.label }}&nbsp;
             {{ form.ind_alias(size=32) }}<br>
         </p>
-          {{ form.gender.label }} {{ form.gender }}&nbsp;
+          {{ form.Gender.label }} {{ form.Gender }}&nbsp;
           {{ form.dev_stage.label }} {{ form.dev_stage}}<br>
       </div>
 
@@ -90,19 +90,13 @@ function myFunction() {
       <div class="option-content is-hidden">
       <div style = font-size:16px; font-weight:bold;>
               <p>
-            {{ form.sp_name.label }}{{ form.sp_name(size=32) }}&nbsp;
-            {{ form.sp_cname.label }}{{ form.sp_cname(size=32) }}<br>
+            {{ form.sp_name.label }}{{ form.sp_name(size=32) }}<br>
           </p>
-          <p>
-            {{ form.sp_genus.label }}{{ form.sp_genus }}&nbsp;&nbsp;
-            {{ form.sp_species.label }}{{ form.sp_species(size=32) }}&nbsp;&nbsp;
-            {{ form.sp_informal.label }}{{ form.sp_informal(size=32) }}<br>
+          <p>{{ form.sp_cname.label }}{{ form.sp_cname(size=32) }}<br>
           </p>
           <p>{{ form.sp_taxid.label }}{{ form.sp_taxid(size=16) }}<br>
           </p>
-          <p>  {{ form.sp_taxpos.label }} {{ form.sp_taxpos}}&nbsp;&nbsp;
-            {{ form.sp_clade.label }}{{ form.sp_clade }}&nbsp;&nbsp;
-            {{ form.sp_subset.label }} {{ form.sp_subset}}&nbsp;<br>
+          <p>  {{ form.sp_taxpos.label }} {{ form.sp_taxpos}}<br>
         </p>
       </div>
     </div>
@@ -113,7 +107,7 @@ function myFunction() {
       <div class="option-content is-hidden">
       <div style = font-size:16px; font-weight:bold;>
       <p>
-      <select name= pprovname method="GET" action="/">
+      <select name= provname method="GET" action="/">
         {% for prov in prov_list %}
           <option value= "{{prov}}" SELECTED>{{prov}}</option>"
         {% endfor %}
@@ -161,7 +155,7 @@ function myFunction() {
           {{ form.mat_unit.label }}{{ form.mat_unit}}<br>
         </p>
         <p>{{ form.mat_received.label }}{{ form.mat_received(size=16) }}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Provider:&nbsp;
-          <select name= mprovname method="GET" action="/">
+          <select name= provname method="GET" action="/">
             {% for prov in prov_list %}
               <option value= "{{prov}}" SELECTED>{{prov}}</option>"
             {% endfor %}
@@ -188,15 +182,15 @@ function myFunction() {
           {{ form.loc_lng.label }}{{ form.loc_lng(size=10) }}<br><br>
         </p>
         <p>
-          {{ form.coll_method.label }}{{ form.coll_method(size=32) }}&nbsp;
-          {{ form.coll_details.label }}{{ form.coll_details(size=32) }}<br>
+          {{ form.loc_method.label }}{{ form.loc_method(size=32) }}&nbsp;
+          {{ form.loc_details.label }}{{ form.loc_details(size=32) }}<br>
         </p>
         <p>
-          {{ form.coll_weight.label }}{{ form.coll_weight(size=10) }}&nbsp;
-          {{ form.coll_unit.label }}{{ form.coll_unit }}<br>
+          {{ form.loc_weight.label }}{{ form.loc_weight(size=10) }}&nbsp;
+          {{ form.loc_unit.label }}{{ form.loc_unit }}<br>
         </p>
-    <p>{{ form.ind_collected.label }}{{ form.ind_collected(size=16) }}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Collector:&nbsp;
-      <select name= iprovname method="GET" action="/">
+    <p>{{ form.loc_collected.label }}{{ form.loc_collected(size=16) }}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Collector:&nbsp;
+      <select name= provname method="GET" action="/">
         {% for prov in prov_list %}
           <option value= "{{prov}}" SELECTED>{{prov}}</option>"
         {% endfor %}
@@ -247,20 +241,16 @@ function myFunction() {
                 {{ form.file_accession.label }}{{ form.file_accession(size=10) }}<br>
               </p>
               <p>
-                {{ form.file_format.label }}{{ form.file_format }}&nbsp;<br><br>
+                {{ form.file_format.label }}{{ form.file_format }}&nbsp;
                 {{ form.file_PE.label }}{{ form.file_PE}}&nbsp;&nbsp;
-                {{ form.file_reads.label }}{{ form.file_reads(size=20)}}&nbsp;
-                {{ form.file_total.label }}{{ form.file_total }}&nbsp;&nbsp;<br><br>
-                {{ form.file_average.label }}{{ form.file_average}}&nbsp;
-                {{ form.file_depth.label }}{{ form.file_depth }}&nbsp;<br>
+                {{ form.file_reads.label }}{{ form.file_reads(size=20)}}<br>
               </p>
               <p>
                 {{ form.file_md5.label }}{{ form.file_md5(size=40) }}&nbsp;
                 {{ form.file_path.label }}{{ form.file_path(size=60) }}<br>
               </p>
               <p>
-                {{ form.file_comment.label }}{{ form.file_comment(size=32) }}&nbsp;
-                {{ form.file_exclusion.label }}{{ form.file_exclusion }}&nbsp;<br>
+                {{ form.file_comment.label }}{{ form.file_comment(size=32) }}<br>
               </p>
               <p></p>
               <p>

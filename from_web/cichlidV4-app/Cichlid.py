@@ -1,4 +1,4 @@
-#!/Library/Frameworks/Python.framework/Versions/3.7/bin/python3
+#!/usr/bin/python3
 
 from flask import Flask, render_template, request,  flash, redirect, url_for, session, send_file, jsonify
 from flask_mysqldb import MySQL
@@ -15,7 +15,7 @@ from config import Config
 app = Flask(__name__)
 
 '''
-    Website script written by H. Denise (Cambridge Uni) 31/06/2020
+    Website script written by H. Denise (Cambridge Uni) 31/01/2020
     Script for the Cichlid database
 '''
 #initialisation of connection
@@ -41,154 +41,40 @@ login = LoginManager(app)
 app.config.update(mail_settings)
 mail = Mail(app)
 login.login_view = 'login'
-#mail.init_app(app)
+mail.init_app(app)
 session={}
 session['logged_in']=0
 db='cichlid'
 today=time.strftime("%Y-%m-%d")
 time_stamp=time.strftime("%Y-%m-%d-%H-%M-%S")
 ################### DATA PROCESSING FUNCTIONS ##################################
-def add_annotations(results_dic, header_dic, ext_flag):
-    """    add annotations information for other tables than individual"""
-    '''
-    input results_dic: dictionary of data to display with identifier as key and table data as value (dic)
-    input header_dic: dictionary of column_header for each table (dic)
-    input ext_flag: suffix for the data (web for web display, json to download) (str)
-    return results_dic: as input with annotation(s) inserted
-    return header_dic: as input with header(s) relevant to the annotation(s) inserted
-    '''
-    annot_results=[]
-    curs = mysql.connection.cursor()
-    for main_id in results_dic:
-        #get the tables
-        for table in results_dic[main_id]:
-            #transform data onto list
-            list_data=[x for x in list(results_dic[main_id][table])]
-            #get the identifier for each table entry
-            list_identifier=[x[1] for x in list_data]
-            #
-            check_list=[x for x in list_identifier if str(x).isdigit()]
-            if len(check_list) != len(list_identifier):
-                list_identifier=[x[0] for x in list_data]
-            for id in list_identifier:
-                annot_col=""
-                annot_data=""
-                #check if annotations are present in the database for this entry
-                try:
-                    curs.execute("Select distinct * from annotations where table_name = '"+table+"' and table_id = "+str(id))
-                    annot_results=curs.fetchall()
-                except:
-                    if ext_flag=='json':
-                        return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
-                    else:
-                        flash ("Error: unable to fetch annotations information")
-                if len(annot_results) > 0:
-                    #get cv_id for each entry and check how it has to be displayed (no need to display if not informative)
-                    for annotation in annot_results:
-                        try:
-                            curs.execute("Select attribute, comment from cv where cv_id = "+str(annotation[2]))
-                            cv_results=curs.fetchall()
-                        except:
-                            if ext_flag=='json':
-                                return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
-                            else:
-                                flash ("Error: unable to fetch cv information")
-                        if len(cv_results) > 0:
-                            annot_col=cv_results[0][0]
-                            annot_data=",".join([x for x in annotation[-2:] if x is not None])
-                        if header_dic[table][-1] != annot_col:
-                            header_dic[table]=tuple(list(header_dic[table])+[annot_col])
-                        #add the annotation to each entry
-                        list_data[list_identifier.index(id)]=list(list_data[list_identifier.index(id)])+[annot_data]
-            results_dic[main_id][table]=list_data
-    #ensure that all table entry have the same length (required for correct display)
-    for entry_id in results_dic:
-        for table in results_dic[entry_id]:
-            for entry_index in range(len(results_dic[entry_id][table])):
-                results_dic[entry_id][table][entry_index]=tuple(list(results_dic[entry_id][table][entry_index])+list((len(header_dic[table])-len(results_dic[entry_id][table][entry_index]))*" "))
-    return results_dic, header_dic
-
-def add_individual_data_info(results_dic, header_dic, ext_flag):
+def add_individual_data_info(col, data):
     """adding individual_data information if available to 'individual' display"""
     '''
-    input results_dic: dictionary of data to display with identifier as key and table data as value (dic)
-    input header_dic: dictionary of column_header for each table (dic)
-    input ext_flag: suffix for the data (web for web display, json to download) (str)
-    return individual_data_results: as results_dic input with individual_data inserted
-    return header_dic: as input with header(s) relevant to the individual data inserted
+    input col: field headers for individual (now including project and sample fields) (tuple)
+    input data: data for the individual (see add_sample_info) (tuple)
+    return new_col: field headers with individual_data fields added (tuple)
+    return new_data: data for the individual with individual_data info added, if present, in the database (tuple)
     '''
-    individual_data_results={}
-    curs = mysql.connection.cursor()
-    header_list={}
-    cv_equivalence={}
-    individual_data_headers=[]
-    used_pos=[]
-    #get the cv_id, cv_attribute data as dictionary
-    try:
-        curs.execute("Select cv_id, attribute, comment from cv") #where cv_id=3 where comment not in ('entry for table sample', 'entry for table file', 'entry for table material') ")
-        cv_results=curs.fetchall()
-    except:
-        if ext_flag=='json':
-            return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
-        else:
-            flash ("Error: unable to fetch cv information")
-    cv_equivalence={attribute[0]:attribute[1] for attribute in cv_results if attribute[2] not in ('entry for table sample', 'entry for table file', 'entry for table material')}
-    key_list=sorted(list(cv_equivalence.keys()))
-    inverted_cv_equivalence={v:k for k,v in cv_equivalence.items()}
-    #create updated header list
-    for x in range(len(key_list)):
-        individual_data_headers.append(cv_equivalence[key_list[x]])
-        if cv_equivalence[key_list[x]]=='weight': individual_data_headers.append('unit')
-        individual_data_headers.append('comment')
-    #generate dictionary of keys and position in the list of individual data annotations that will be created for each entry
-    key_pos_dic={x:individual_data_headers.index(cv_equivalence[x]) for x in key_list }
-    original_header_length=len(header_dic['individual'])
-    header_dic['individual']=tuple(list(header_dic['individual'])+individual_data_headers)
-    #go through the input data dictionary
-    for main_id in results_dic:
-        #transform values for each table onto a list instead of a tuple (list can be updated, tuple cannot)
-        individual_data_results[main_id]={x:list(y) for x,y in results_dic[main_id].items()}
-        #get the data for the table individual
-        individual_entries=list(results_dic[main_id]['individual'])
-        #transform the individual data onto lists
-        list_data=[list(x) for x in individual_entries]
-        for individual_entry in list_data:
-            entry_index=list_data.index(individual_entry)
-            #get the individual_id
-            identifier=individual_entry[1]
-            #check if individual_data are present in the database for this entry
-            try:
-                curs.execute("Select distinct * from individual_data where latest=1 and individual_id = "+str(identifier))
-                ind_data_table_results=curs.fetchall()
-            except:
-                if ext_flag=='json':
-                    return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
-                else:
-                    flash ("Error: unable to fetch individual_data information")
-            if len(ind_data_table_results) > 0:
-                #prepare list with empty elements. They will each correspond to a category value (note weight has 2 attributes (value, unit) in addition to the comment)
-                individual_data_entry=['']*((len(cv_equivalence)*2)+1)
-                #get cv_id for each entry and check how it has to be displayed (no need to display if not informative)
-                for ind_data in ind_data_table_results:
-                    cv_value=ind_data[2]
-                    individual_data_entry[key_pos_dic[cv_value]]=ind_data[3] #value
-                    used_pos.append(key_pos_dic[cv_value]+original_header_length)
-                    if cv_value != inverted_cv_equivalence['weight']:
-                        individual_data_entry[key_pos_dic[cv_value]+1]=ind_data[5] #comment
-                        if ind_data[5] !="" and ind_data[5] is not None: used_pos.append(key_pos_dic[cv_value]+1+original_header_length)
-                    else:
-                        individual_data_entry[key_pos_dic[cv_value]+1]=ind_data[4] #unit
-                        used_pos.append(key_pos_dic[cv_value]+1+original_header_length)
-                        individual_data_entry[key_pos_dic[cv_value]+2]=ind_data[5] #comment
-                        if ind_data[5] !="" and ind_data[5] is not None: used_pos.append(key_pos_dic[cv_value]+2+original_header_length)
-                individual_entry+=individual_data_entry
-            individual_data_results[main_id]['individual'][entry_index]=individual_entry
-    #'clean' the data before returning them by removing the 'empty'
-    for main_id in individual_data_results:
-        for j in range(len(individual_data_results[main_id]['individual'])):
-            individual_data_results[main_id]['individual'][j]=[individual_data_results[main_id]['individual'][j][x] for x in range(len(individual_data_results[main_id]['individual'][j])) if x < original_header_length or x in used_pos]
-    header_dic['individual']=[header_dic['individual'][x] for x in range(len(header_dic['individual'])) if x< original_header_length or x in used_pos]
-    return individual_data_results, header_dic
+    new_col=col
+    new_data=data
+    curs=mysql.connection.cursor()
+    if len(data) > 0:
+        try:
+            curs.execute("SELECT distinct * from individual_data where latest=1 and individual_id = '{indi}';". format(indi=data[0]))
+            id_results=curs.fetchall()
+        except:
+            if ext_flag=='json':
+                return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
+            else:
+                flash ("Error: unable to fetch individual_data information")
+        if len(id_results) > 0:
+            #to cope with case when there is more than one individual_data associated with the individual
+            for id_result in id_results:
+                new_col+=tuple(["cv_id","value","unit", "comment"])
+                new_data+=tuple(list(id_result[2:6]))
+    curs.close()
+    return new_col, new_data
 
 def add_project_info(col, data):
     """adding project information, if available, to 'individual' vertical display"""
@@ -260,7 +146,6 @@ def change_for_display(col, data, ext_flag):
     list_old_data=[]
     list_new_data=[]
     list_new_columns=[]
-    maxThumbnail=0
     #dictionary with 'table' name as key and name/attribute(s) values
     table_dic={'assembly':'name', 'cv':'attribute, comment', 'developmental_stage':'name', 'family':'name', 'file':'name',
     'image':'filename', 'individual':'name', 'lane':'name', 'library':'ssid', 'library_type':'name',
@@ -341,6 +226,7 @@ def change_for_display(col, data, ext_flag):
                         flash ("Error: unable to fetch items: "+"SELECT "+table_dic[table_name_dic[dic_index]]+ " FROM "+table_name_dic[dic_index]+" WHERE "+table_name_dic[dic_index]+"_id = '{id}';". format(id=row[dic_index]))
                 curs.close()
         #section to add data in correct field when several fields are returned
+
         #if species field (species_name) in column:
         if 'species_name' in column:
             if row[column.index('species_name')] is None:
@@ -377,7 +263,7 @@ def change_for_display(col, data, ext_flag):
         if column[0]=='individual_id':
             column[1]="supplier_name"
             curs = mysql.connection.cursor()
-            curs.execute("SELECT filepath, filename FROM image WHERE latest=1 and individual_id= '{id}';". format(id=row[0]))
+            curs.execute("SELECT filepath, filename FROM image WHERE individual_id= '{id}';". format(id=row[0]))
             image_results=curs.fetchall()
             curs.close()
             if 'thumbnail' not in column:
@@ -385,13 +271,10 @@ def change_for_display(col, data, ext_flag):
             if image_results and 'samples' not in column:
                 for image_index in range(0, len(image_results)):
                     #create path to image file
-                    if image_results[image_index][0] is not None:
-                        row.append("/".join(list(image_results[image_index])))
-                        #required to match column and data length
-                        if image_index > 0:
-                            column.append('thumbnail')
-                    #get the higher number of thumbnails to ensure proper display
-                    maxThumbnail=max(maxThumbnail,column.count("thumbnail"))
+                    row.append("/".join(list(image_results[image_index])))
+                    #required to match column and data length
+                    if image_index > 0:
+                        column.append('thumbnail')
             else:
                 row.append('')
         #get the updated columns and data in a list
@@ -400,10 +283,6 @@ def change_for_display(col, data, ext_flag):
         #if there is more than one entry for an individual, order by latest and reverse date
         if column[0]=='individual_id' and len(column) > 13:
             list_new_data = reorder_for_vertical_display(list_new_data)
-    #The number of thumbnail to display is taken from the column entry in the list_new_column. So ensure the length is the maximum of thumbnails to display
-    if column[0]=="individual_id":
-        for i in range(0, maxThumbnail-list_new_columns[0].count("thumbnail")):
-            list_new_columns[0].append("thumbnail")
     return tuple(list_new_columns), tuple(list_new_data)
 
 def check_data(table, dic, criteria):
@@ -757,14 +636,6 @@ def upload(file, usrname):
         #if upload successful: remove the tmp file
         os.remove(TMPPATH+file)
         session['usrname']=usrname
-        '''
-        with app.app_context():
-            msg = Message(subject="new upload from website",
-                sender=app.config.get("MAIL_USERNAME"),
-                recipients=['had38@cam.ac.uk'], #app.config.get("MAIL_USERNAME") replace with your email for testing
-                body="File uploaded: "+OUTPATH+"file_upload_"+today+suffix+"_"+usrname+".tsv")
-            mail.send(msg)
-        '''
         flash ('file uploaded successfully')
         return redirect(url_for('enter_data'))
     else:
@@ -830,26 +701,19 @@ def write_data(usr_data, usrname):
     input usr_data: list of tuple collecting the data entered onto the form on the upload page
     return call to enter_data page
     '''
-    full_column_list=['option', 'individual_name', 'alias', 'species_name', 'genus', 'species', 'informal', 'taxon_id', 'common_name',
-     'taxon_position', 'date_collected', 'collection_method', 'collection_details', 'collector_name', 'country', 'location',
-     'location_details', 'latitude', 'longitude', 'sex', 'developmental_name', 'individual_weight', 'unit', 'individual_comment',
-     'clade', 'species_subset', 'material_name', 'material_accession', 'organism_part', 'material_type', 'storage_condition',
-     'material_location', 'material_amount', 'material_unit', 'material_provider_name', 'material_comment', 'date_received',
-     'image_name', 'image_path', 'image_comment', 'image_licence', 'project_name', 'project_alias', 'project_ssid', 'project_accession',
-     'sample_name', 'sample_accession', 'sample_ssid', 'sample_comment', 'lane_name', 'lane_accession', 'library_name', 'library_ssid',
-     'seq_centre', 'seq_tech', 'paired-end', 'file_name', 'format', 'file_accession', 'md5', 'filepath', 'nber_reads', 'total_length',
-     'average_length', 'sequence_depth', 'exclusion_code', 'file_comment']
-
-    form_column_dic={'option': 0, 'ind_name': 1, 'ind_alias': 2, 'sp_name': 3, 'sp_genus': 4, 'sp_species': 5, 'sp_informal': 6, 'sp_taxid': 7,
-     'sp_cname': 8, 'sp_taxpos': 9, 'ind_collected': 10, 'coll_method': 11, 'coll_details': 12, 'iprovname': 13, 'loc_country': 14, 'loc_region': 15,
-     'loc_details': 16, 'loc_lat': 17, 'loc_lng': 18, 'gender': 19, 'dev_stage': 20, 'coll_weight': 21, 'coll_unit': 22, 'ind_comment' : 23, 'sp_clade': 24,
-     'sp_subset': 25, 'mat_name': 26, 'mat_acc': 27, 'mat_part': 28, 'mat_type': 29, 'mat_cond': 30, 'mat_location': 31, 'mat_wgt': 32, 'mat_unit': 33,
-     'mprovname': 34, 'mat_comment': 35, 'mat_received': 36, 'img_name': 37, 'img_source': 38, 'img_comment': 39, 'img_licence': 40, 'prj_name': 41,
-     'prj_alias': 42, 'prj_ssid': 43, 'prj_acc': 44, 'spl_name': 45, 'spl_accession': 46, 'spl_ssid': 47, 'spl_comment': 48, 'lane_name': 49,
-     'lane_accession': 50, 'lib_name': 51, 'lib_ssid': 52, 'seq_centre': 53, 'seq_tech': 54, 'file_PE': 55, 'file_name': 56, 'file_format': 57,
-     'file_accession': 58, 'file_md5': 59, 'file_path': 60, 'file_reads': 61, 'file_total': 62, 'file_average': 63, 'file_depth': 64,
-     'file_exclusion': 65, 'file_comment': 66}
-    annotations_table_dic={'ext': 'material', 'col': 'individual', 'stg': 'material', 'seq': 'sample', 'pro': 'sample'}
+    full_column_list=['option', 'individual_name', 'alias', 'sex', 'species_name', 'taxon_id', 'common_name', 'taxon_position', 'date_collected', 'collection_method', 'collection_details',
+     'collector_name', 'country', 'location', 'location_details', 'latitude', 'longitude', 'developmental_name', 'individual_weight', 'unit', 'organism_part', 'individual_comment', 'image_name',
+     'image_path', 'image_comment', 'image_licence', 'material_name', 'material_accession', 'material_type', 'date_received', 'storage_condition', 'material_location',
+     'material_amount', 'material_unit', 'material_comment', 'material_provider_name', 'project_name', 'project_alias', 'project_ssid', 'project_accession', 'sample_name', 'sample_accession',
+     'sample_ssid', 'sample_comment', 'lane_name', 'lane_accession', 'library_name', 'library_ssid', 'file_name', 'file_accession', 'format', 'paired-end', 'md5', 'filepath', 'file_comment',
+     'nber_reads', 'seq_centre', 'seq_tech']
+    form_column_dic={'Option':0, 'ind_name':1, 'ind_alias':2, 'Gender':3, 'dev_stage':17, 'ind_comment':21, 'sp_name':4, 'sp_cname':6, 'sp_taxid':5, 'sp_taxpos':7, 'provname':11,
+     'pv_name':11, 'mat_name':26, 'mat_acc':27, 'mat_type':28, 'mat_part':20, 'mat_cond':30, 'mat_location':31, 'mat_wgt':32, 'mat_unit':33, 'mat_received':29,
+     'mat_comment':34, 'mat_provider':35,'loc_country':12, 'loc_region':13, 'loc_details':14, 'loc_lat':15, 'loc_lng':16, 'loc_method':9, 'loc_weight':18, 'loc_unit':19, 'loc_collected':8, 'prj_name':36,
+     'prj_alias':37, 'prj_acc':39, 'prj_ssid':38, 'spl_name':40, 'spl_accession':41, 'spl_ssid':42, 'spl_comment':43, 'lane_name':44, 'lane_accession':45, 'lib_name':46, 'lib_ssid':46,
+     'file_name':48, 'file_accession':49, 'file_format':50, 'file_PE':51, 'file_reads':55, 'file_md5':52, 'file_path':53, 'file_comment':54, 'seq_tech':57, 'seq_centre':56, 'img_name':22,
+     'img_source':23, 'img_comment':24, 'img_licence':25}
+    annotations_table_dic={'ext': 'material', 'col': 'individual', 'stg': 'material', 'seq': 'sample'}
     annotations_dic={}
     provider_dic={}
     header_submission=[]
@@ -865,15 +729,14 @@ def write_data(usr_data, usrname):
                 if len(usr_data[header]) > 0:
                     annotations_dic[header]= usr_data[header]
             #case where provider info is provided
-            elif header in ['pprovname', 'pv_name', 'pv_fname', 'pv_mail', 'pv_phone', 'pv_address']:
+            elif header in ['pv_name', 'pv_fname', 'pv_mail', 'pv_phone', 'pv_address']:
                 if len(usr_data[header]) > 0:
                      provider_dic[header]=usr_data[header]
             else:
-                #group mat location and mat location position (2 fields in the entry page, 1 field in the template)
+                #group mat location and mat loca position (2 fields in the entry page)
                 if header == "mat_loc_pos":
                     if  len(str(usr_data["mat_loc_pos"])) != 0:
                         data_submitted[form_column_dic["mat_location"]]+=", "+str(usr_data["mat_loc_pos"])
-                        if data_submitted[form_column_dic["mat_location"]].startswith(", "): data_submitted[form_column_dic["mat_location"]]=data_submitted[form_column_dic["mat_location"]][2:]
                 else:
                     data_submitted[form_column_dic[header]]=usr_data[header]
     #Check that the individual name field is present as it is the only compulsory field
@@ -886,24 +749,16 @@ def write_data(usr_data, usrname):
             #get which table the comment should be associated with
             ann_table = annotations_table_dic[annotations_dic['ann_cat']]
             annotations_dic['value']=annotations_dic['ann_ann']
-            if 'ann_comment' in annotations_dic: annotations_dic['comment']=annotations_dic['ann_comment']
-            #if the table is defined
+            annotations_dic['comment']=annotations_dic['ann_comment']
             if annotations_dic['ann_ann'] != "":
             #if comment already listed in header list, add to data in data_submitted
                 index_field=full_column_list.index(ann_table+"_comment")
-                if len(data_submitted[index_field])==0:
-                    if 'ann_comment' in annotations_dic:
-                        data_submitted[index_field]=annotations_dic['ann_ann'] + " ("+annotations_dic['ann_comment']+")"
-                    else:
-                        data_submitted[index_field]=annotations_dic['ann_ann']
+                if data_submitted[index_field]=="":
+                    data_submitted[index_field]=annotations_dic['ann_ann'] + " ("+annotations_dic['ann_comment']+")"
                 else:
-                    if 'ann_comment' in annotations_dic:
-                        data_submitted[index_field]+="; "+annotations_dic['ann_ann'] + " ("+annotations_dic['ann_comment']+")"
-                    else:
-                        data_submitted[index_field]+="; "+annotations_dic['ann_ann']
+                    data_submitted[index_field]+="; "+annotations_dic['ann_ann'] + " ("+annotations_dic['ann_comment']+")"
         issues=[]
-        #separate to another function?
-        if provider_dic != {'pprovname': '-select-'}:
+        if len(provider_dic)>0:
             if 'pv_name' not in provider_dic:
                 flash("-  The provider name is an essential field for the provider section")
                 session['usrname']=usrname
@@ -975,16 +830,18 @@ def verify_password(stored_password, provided_password):
     return pwdhash == stored_password
 
 ################### WEB APP FUNCTIONS ##########################################
-@app.route('/'+db+'/api/1.1/download', methods=['GET', 'POST'])
+@app.route('/api/1.1/download', methods=['GET', 'POST'])
 def download():
     """function to provide the csv template to enter data"""
-    return send_file("template_entry.tsv",
-        mimetype="text/tsv", attachment_filename='template_entry.tsv', as_attachment=True)
+    return send_file("entry.tsv",
+        mimetype="text/tsv", attachment_filename='entry.tsv', as_attachment=True)
 
-@app.route('/'+db+'/api/1.1/enter_data', methods=['GET', 'POST'])
+@app.route('/api/1.1/enter_data', methods=['GET', 'POST'])
 def enter_data():
     """function to provide for the entry page where user can update, overwrite or enter new data in the database"""
     usrname=session.get('usrname', None)
+    print(usrname)
+    session['usrname']=usrname
     form = EnterDataForm()
     form.Usrname.choices=((usrname))
     provider_list=[]
@@ -1003,23 +860,29 @@ def enter_data():
     provider_list.append("-select-")
     #provider_list.append("-choose providers-")
     if request.method == "POST" :
-        #save file in a temp folder if re-uploading a fill template
         results=request.form
+        print(results)
+        usrname=session.get('usrname', None)
+        print(usrname)
+        #save file in a temp folder if re-uploading a fill template
         if request.form['Sform'] == 'submit':
-            session['usrname']=usrname
+            session['usrname']='had38'
+            usrname='had38'
             upload_file=request.files['file']
+            print(usrname)
             if upload_file.filename=="":
                 session['usrname']=usrname
                 flash("Please choose a file to upload")
             else:
                 upload_name=".".join(upload_file.filename.split(".")[:-1])+"_"+time_stamp+"_"+usrname+"."+upload_file.filename.split(".")[-1]
+                print(os.path.join(TMPPATH, upload_name))
+                print("")
                 upload_file.save(os.path.join(TMPPATH, upload_name))
                 session['usrname']=usrname
                 upload(upload_name, usrname)
         else:
             #write data onto a tab separated file if filling the form
             session['usrname']=usrname
-            # if 'Download' in results:
             if request.form['Sform'] == 'downl':
                 return redirect(url_for('download'))
             elif 'Sform' in results:
@@ -1031,7 +894,7 @@ def enter_data():
     session['usrname']=usrname
     return render_template('enter_data.html', usrname=usrname, form=form, prov_list=tuple(provider_list), db=db, session=session)
 
-@app.route('/'+db+'/api/1.1/faq', methods=['GET', 'POST'])
+@app.route('/api/1.1/faq', methods=['GET', 'POST'])
 def faq():
     """function to display the faq page"""
     proj=[]
@@ -1047,7 +910,7 @@ def faq():
 
 #@app.route('/')
 #@app.route('/index')
-@app.route('/'+db+'/index', methods=['GET', 'POST'])
+@app.route('/index', methods=['GET', 'POST'])
 def index():
     """main function for the main page where user can choose the way to interrogate the database"""
     individual_name=""
@@ -1170,7 +1033,7 @@ def index():
             flash("Please enter valid criteria")
     return render_template("entry.html", title='Query was: returnall', form=form, project_list=tuple(list_proj), loc_list=tuple(list_loc), db=db, ext_flag=ext_flag, log=status, usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/info', methods=['GET', 'POST'])
+@app.route('/api/1.1/info', methods=['GET', 'POST'])
 def info():
     """function to display the about page"""
     proj=[]
@@ -1266,7 +1129,7 @@ def register():
     return render_template('register.html', title='Register', form=form, db=db)
 
 ################### API RELATED FUNCTIONS ######################################
-@app.route('/'+db+'/api/1.1/file/<f_id>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/file/<f_id>/<ext_flag>', methods=['GET'])
 def get_file_per_file_id(f_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
@@ -1341,7 +1204,7 @@ def get_file_per_file_id(f_id, ext_flag):
             for_display="file name (file_id)= '"+fresults[0][3]+"' ("+str(f_id)+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['file',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/file/'+f_id+'/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='file')
 
-@app.route('/'+db+'/api/1.1/file/<f_id>/all/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/file/<f_id>/all/<ext_flag>', methods=['GET'])
 def get_file_per_file_id_all(f_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
@@ -1402,7 +1265,6 @@ def get_file_per_file_id_all(f_id, ext_flag):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     file_results[f_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    file_results, col_dic= add_annotations(file_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(file_results, col_dic, ext_flag, "file")
     if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
@@ -1413,7 +1275,7 @@ def get_file_per_file_id_all(f_id, ext_flag):
             for_display="file name (file_id)= '"+fresults[0][3]+"' ("+str(f_id)+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['file',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/file/'+f_id+'/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='file')
 
-@app.route('/'+db+'/api/1.1/image/<im_id>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/image/<im_id>/<ext_flag>', methods=['GET'])
 def get_image_per_image_id(im_id, ext_flag):
     results=[]
     columns=get_columns_from_table('image')
@@ -1442,7 +1304,7 @@ def get_image_per_image_id(im_id, ext_flag):
             session['criteria']="image name (image_id)= "+str(img_results[0][-1]) +" ("+str(im_id)+")"
             return redirect(url_for('get_individual_per_individual_id', i_id="("+str(img_results[0][0])+")", ext_flag=ext_flag))
 
-@app.route('/'+db+'/api/1.1/image/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/image/<ext_flag>', methods=['GET'])
 def get_images(ext_flag):
     results=[]
     columns=get_columns_from_table('image')
@@ -1465,10 +1327,7 @@ def get_images(ext_flag):
             flash ("Error: no image data available in the database '"+db+"'")
             return redirect(url_for('index'))
     for row in img_results:
-        if row[2] is not None:
-            i_results=[row[0]]+[row[1]]+[row[2]]+list([row[3]+"/"+row[2]])+[row[4]]
-        else:
-            i_results=[row[0]]+[row[1]]+['--', '--']+[row[4]]
+        i_results=[row[0]]+[row[1]]+[row[2]]+list([row[3]+"/"+row[2]])+[row[4]]
         results.append(tuple(i_results))
     new_column, display_results= change_for_display([columns], results, ext_flag)
     if ext_flag=='json':
@@ -1478,7 +1337,7 @@ def get_images(ext_flag):
         #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed)crumbs (to display navigation history))
         return render_template("image2.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/image/all/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/image/all/<ext_flag>', methods=['GET'])
 def get_images_all(ext_flag):
     results=[]
     columns=get_columns_from_table('image')
@@ -1502,10 +1361,7 @@ def get_images_all(ext_flag):
             return redirect(url_for('index'))
     else:
         for row in img_results:
-            if row[2] is not None:
-                i_results=[row[0]]+[row[1]]+[row[2]]+list([row[3]+"/"+row[2]])+list(row[3:])
-            else:
-                i_results=[row[0]]+[row[1]]+['--', '--', '--']+list(row[4:])
+            i_results=[row[0]]+[row[1]]+[row[2]]+list([row[3]+"/"+row[2]])+list(row[3:])
             results.append(tuple(i_results))
         new_column, display_results= change_for_display([columns], results, ext_flag)
         if ext_flag=='json':
@@ -1515,7 +1371,7 @@ def get_images_all(ext_flag):
             #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
             return render_template("image2.html", title='Query was: all images', url_param=['image', 0, '/web'], results=[new_column[0],display_results], plus=['/'+db+'/api/1.1/image/web', 'no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/individual/<i_id>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/individual/<i_id>/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_id(i_id, ext_flag):
     pcolumns=list(get_columns_from_table('project'))
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
@@ -1598,12 +1454,12 @@ def get_individual_per_individual_id(i_id, ext_flag):
             for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+space_i_id+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/individual/('+i_id+')/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
-@app.route('/'+db+'/api/1.1/individual/<i_id>/all/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/individual/<i_id>/all/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_id_all(i_id, ext_flag):
     pcolumns=get_columns_from_table('project')
-    icolumns=get_columns_from_table('individual')
-    #ind_id_columns=get_columns_from_table('individual_data')
-    #icolumns=ind_columns[:12]+ind_id_columns[2:6]+ind_columns[12:]
+    ind_columns=get_columns_from_table('individual')
+    ind_id_columns=get_columns_from_table('individual_data')
+    icolumns=ind_columns[:12]+ind_id_columns[2:6]+ind_columns[12:]
     mcolumns=get_columns_from_table('material')
     scolumns=get_columns_from_table('sample')
     fcolumns=get_columns_from_table('file')
@@ -1630,7 +1486,9 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
         try:
             curs.execute("select distinct i.row_id, i.individual_id, i.name, i.alias, i.species_id, i.sex, \
             i.accession, i.location_id, i.provider_id, i.date_collected, i.collection_method, i.collection_details, \
-            i.father_id, i.mother_id, i.changed, i.latest FROM individual i where i.latest=1 and i.individual_id = %s" % individual_id)
+            id.cv_id, id.value, id.unit, id.comment, i.father_id, i.mother_id, i.changed, i.latest FROM individual i \
+            left join individual_data id on i.individual_id=id.individual_id \
+            where i.latest=1 and i.individual_id = %s" % individual_id)
             iresults=curs.fetchall()
         except:
             if ext_flag=='json':
@@ -1669,8 +1527,6 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
         individual_results[individual_id]=table_dic
     curs.close()
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    individual_results, col_dic = add_individual_data_info(individual_results, col_dic, ext_flag)
-    individual_results, col_dic = add_annotations(individual_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(individual_results, col_dic, ext_flag, "individual")
     if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
@@ -1681,7 +1537,7 @@ def get_individual_per_individual_id_all(i_id, ext_flag):
             for_display="individual name (individual_id)= "+", ".join(list_i_name)+" ("+space_i_id+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['individual',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/individual/('+i_id+')/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
-@app.route('/'+db+'/api/1.1/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_individual_name(ind_name, ext_flag):
     ind_list=ind_name.replace(" ","").replace(",", "','")
     results=""
@@ -1710,7 +1566,7 @@ def get_individual_per_individual_name(ind_name, ext_flag):
         else:
             return(redirect(url_for('get_individual_per_individual_id', i_id=results[1:], db=db, ext_flag=ext_flag)))
 
-@app.route('/'+db+'/api/1.1/individual/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/individual/<ext_flag>', methods=['GET'])
 def get_individuals(ext_flag):
     icolumns=get_columns_from_table('individual')
     columns=list(icolumns[1:8]+tuple(['samples']))
@@ -1746,7 +1602,7 @@ def get_individuals(ext_flag):
                 #for image display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
                 return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[columns, remove_column(display_results, 'L')], plus=['all/web', 'yes'], db=db, ext_flag=ext_flag,  log=session['logged_in'], usrname=session.get('usrname', None), first_display='individual')
 
-@app.route('/'+db+'/api/1.1/individual/all/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/individual/all/<ext_flag>', methods=['GET'])
 def get_individuals_all(ext_flag):
     ind_columns=get_columns_from_table('individual')
     ind_id_columns=get_columns_from_table('individual_data')
@@ -1783,7 +1639,7 @@ def get_individuals_all(ext_flag):
                 #for classical display: url_param ([0]: to create link, [1]: identify field to use in link), results (data to display with field, data_file1, data_file2...), plus ([0] to create link , [1] select if '+' or '-' is displayed), crumbs (to display navigation history))
                 return render_template("mysql.html", title='Query was: all individuals', url_param=['individual', 0, '/web'], results=[new_columns[0][:-1], remove_column(display_results, 'L')], plus=['/'+db+'/api/1.1/individual/web', 'no'],db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/lane/<l_id>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/lane/<l_id>/<ext_flag>', methods=['GET'])
 def get_lane_per_lane_id(l_id, ext_flag):
     results=[]
     lane_acc_dic={}
@@ -1808,7 +1664,7 @@ def get_lane_per_lane_id(l_id, ext_flag):
         session['criteria']="lane accession (lane_id)= "+str(lresults[0][-1]) +" ("+str(l_id)+")"
         return redirect(url_for('get_file_per_file_id', f_id=lresults[0][0], ext_flag=ext_flag))
 
-@app.route('/'+db+'/api/1.1/lane/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/lane/<ext_flag>', methods=['GET'])
 def get_lanes(ext_flag):
     lcolumns=get_columns_from_table('lane')
     columns=tuple([lcolumns[1]])+tuple([lcolumns[6]])+tuple([lcolumns[2]])+tuple([lcolumns[3]]) +tuple([lcolumns[6]]) +tuple([lcolumns[7]]) + tuple(["files"])
@@ -1837,7 +1693,7 @@ def get_lanes(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all lanes', url_param=['lane', 0, '/web'], results=[new_column[0], display_results], plus =['all/web','yes'], db=db, log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/lane/all/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/lane/all/<ext_flag>', methods=['GET'])
 def get_lanes_all(ext_flag):
     lcolumns=get_columns_from_table('lane')
     columns=[lcolumns[1]]+[lcolumns[6]]+list(lcolumns[2:6]) + list(lcolumns[7:] +tuple(["files"]))
@@ -1866,7 +1722,7 @@ def get_lanes_all(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all lanes', url_param=['lane', 0, '/web'], results=[new_column[0], display_results], plus=['/'+db+'/api/1.1/lane/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/location/<loc_id>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/location/<loc_id>/<ext_flag>', methods=['GET'])
 def get_individual_per_location_id(loc_id, ext_flag):
     columns=get_columns_from_table('individual')[1:]
     results=[]
@@ -1891,7 +1747,7 @@ def get_individual_per_location_id(loc_id, ext_flag):
         session['criteria']="location name (location_id)= "+res[0][-1] +" ("+str(loc_id)+")"
         return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
 
-@app.route('/'+db+'/api/1.1/location/<loc_id>/individual/<ind_id>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/location/<loc_id>/individual/<ind_id>/<ext_flag>', methods=['GET'])
 def get_individual_per_id_and_per_location_id(loc_id, ind_id, ext_flag):
     list_loc_id ="("+loc_id+")"
     loc_columns=get_columns_from_table('individual')
@@ -1905,8 +1761,8 @@ def get_individual_per_id_and_per_location_id(loc_id, ind_id, ext_flag):
         if ext_flag=='json':
             return jsonify({"Connection error":"could not connect to database "+db+" or unknown url parameters"})
         else:
-            flash ("Erro(r: unable to fetch location and / or individual")
-    curs.close()
+            flash ("Error: unable to fetch location and / or individual")
+    curs.close
     if len(lresults) > 0:
         results="("+",".join([str(x[0]) for x in lresults])+")"
         return(redirect(url_for('get_individual_per_individual_id', i_id=results, ext_flag=ext_flag)))
@@ -1917,7 +1773,7 @@ def get_individual_per_id_and_per_location_id(loc_id, ind_id, ext_flag):
             flash ("no location associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/'+db+'/api/1.1/location/name/<location>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/location/name/<location>/<ext_flag>', methods=['GET'])
 def get_individual_per_location(location, ext_flag):
     loc_columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
@@ -1942,7 +1798,7 @@ def get_individual_per_location(location, ext_flag):
             flash ("no location associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/'+db+'/api/1.1/location/name/<location>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/location/name/<location>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_name_and_per_location(location, ind_name, ext_flag):
     ind_list=ind_name.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
@@ -1967,7 +1823,7 @@ def get_individual_per_name_and_per_location(location, ind_name, ext_flag):
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/'+db+'/api/1.1/location/name/<location>/sample/name/<sname>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/location/name/<location>/sample/name/<sname>/<ext_flag>', methods=['GET'])
 def get_samples_by_sample_name_and_location(sname, location, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]
@@ -1993,7 +1849,7 @@ def get_samples_by_sample_name_and_location(sname, location, ext_flag):
             flash ("no sample associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/'+db+'/api/1.1/location/name/<location>/species/name/<sp_name>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/location/name/<location>/species/name/<sp_name>/<ext_flag>', methods=['GET'])
 def get_species_per_name_and_per_location(location, sp_name, ext_flag):
     curs = mysql.connection.cursor()
     try:
@@ -2017,7 +1873,7 @@ def get_species_per_name_and_per_location(location, sp_name, ext_flag):
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/'+db+'/api/1.1/location/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/location/<ext_flag>', methods=['GET'])
 def get_location(ext_flag):
     loc_columns=get_columns_from_table('location')
     columns=list(loc_columns)+["species", "individuals"]
@@ -2052,7 +1908,7 @@ def get_location(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all locations', url_param=['location',0, '/web'], results=[columns,results], plus =['.',''], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/material/<m_id>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/material/<m_id>/<ext_flag>', methods=['GET'])
 def get_material_per_material_id(m_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
@@ -2120,7 +1976,7 @@ def get_material_per_material_id(m_id, ext_flag):
         for_display="material name (material_id)= "+mresults[0][3]+" ("+str(m_id)+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['material',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/material/'+m_id+'/all/web','yes'],db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='material')
 
-@app.route('/'+db+'/api/1.1/material/<m_id>/all/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/material/<m_id>/all/<ext_flag>', methods=['GET'])
 def get_material_per_material_id_all(m_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
@@ -2179,8 +2035,6 @@ def get_material_per_material_id_all(m_id, ext_flag):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     material_results[m_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    material_results, col_dic =add_individual_data_info(material_results, col_dic, ext_flag)
-    material_results, col_dic = add_annotations(material_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(material_results, col_dic, ext_flag, "material")
     if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
@@ -2188,7 +2042,7 @@ def get_material_per_material_id_all(m_id, ext_flag):
         for_display="material name (material_id)= "+mresults[0][4]+" ("+str(m_id)+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['material',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/material/'+m_id+'/web','no'],db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='material')
 
-@app.route('/'+db+'/api/1.1/material/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/material/<ext_flag>', methods=['GET'])
 def get_material(ext_flag):
     scolumns=get_columns_from_table('material')
     columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[9]])+tuple([scolumns[12]])+scolumns[13:14]+tuple(["samples"])
@@ -2219,7 +2073,7 @@ def get_material(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_columns[0], display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/material/all/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/material/all/<ext_flag>', methods=['GET'])
 def get_material_all(ext_flag):
     scolumns=get_columns_from_table('material')
     columns=tuple([scolumns[1]])+tuple([scolumns[4]])+scolumns[2:4]+tuple([scolumns[12]])+scolumns[5:12]+scolumns[13:]+tuple(["samples"])
@@ -2245,15 +2099,13 @@ def get_material_all(ext_flag):
             return redirect(url_for('index'))
     else:
         new_columns, display_results= change_for_display([columns], list(results), ext_flag)
-        #add annotations: re-format the data onto 'fake' dictionaries to use fonction and keep unique header entries.
-        display_results_dic, new_column_dic = add_annotations({"fake_dict": {"material":display_results}}, {'material': [x for x in set(tuple(y) for y in new_columns)][0]}, ext_flag)
         if ext_flag=='json':
-            json_results=tuple_to_dic(list(new_column_dic["material"]), display_results_dic["fake_dict"]["material"], "materials")
+            json_results=tuple_to_dic(new_columns[0], display_results, "materials")
             return jsonify(webresults_to_dic(json_results))
         else:
-            return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_column_dic["material"], display_results_dic["test"]["material"]], plus=['/'+db+'/api/1.1/material/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+            return render_template("mysql.html", title='Query was: all materials', url_param=['material',0, '/web'], results=[new_columns[0], display_results], plus=['/'+db+'/api/1.1/material/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/project/<p_id>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/project/<p_id>/<ext_flag>', methods=['GET'])
 def get_project_per_project_id(p_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
@@ -2329,7 +2181,7 @@ def get_project_per_project_id(p_id, ext_flag):
         for_display="project name (project_id)= "+presults[0][1]+" ("+p_id+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/project/'+p_id+'/all/web','yes'], db=db, ext_flag=ext_flag, log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
 
-@app.route('/'+db+'/api/1.1/project/<p_id>/all/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/project/<p_id>/all/<ext_flag>', methods=['GET'])
 def get_project_per_project_id_all(p_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
@@ -2392,8 +2244,6 @@ def get_project_per_project_id_all(p_id, ext_flag):
     table_dic={'project':presults, 'individual': iresults, 'material': mresults, 'sample': sresults, 'file': fresults}
     project_results[p_id]=table_dic
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    project_results, col_dic =add_individual_data_info(project_results, col_dic, ext_flag)
-    project_results, col_dic = add_annotations(project_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(project_results, col_dic, ext_flag, "project")
     if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
@@ -2402,7 +2252,7 @@ def get_project_per_project_id_all(p_id, ext_flag):
         session['criteria']=for_display
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['project',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/project/'+p_id+'/web','no'], db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='project')
 
-@app.route('/'+db+'/api/1.1/project/name/<accession>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/project/name/<accession>/<ext_flag>', methods=['GET'])
 def get_project_per_accession(accession, ext_flag):
     curs = mysql.connection.cursor()
     try:
@@ -2426,7 +2276,7 @@ def get_project_per_accession(accession, ext_flag):
         else:
             return(redirect(url_for('get_project_per_project_id', p_id=results[0][0], ext_flag=ext_flag)))
 
-@app.route('/'+db+'/api/1.1/project/name/<accession>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/project/name/<accession>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_project_accession_and_name(accession, ind_name, ext_flag):
     result=[]
     ind_list=ind_name.replace(" ","").replace(",", "','")
@@ -2453,7 +2303,7 @@ def get_individual_per_project_accession_and_name(accession, ind_name, ext_flag)
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/'+db+'/api/1.1/project/name/<accession>/location/name/<location>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/project/name/<accession>/location/name/<location>/<ext_flag>', methods=['GET'])
 def get_project_per_accession_and_location(accession, location, ext_flag):
     curs = mysql.connection.cursor()
     try:
@@ -2479,7 +2329,7 @@ def get_project_per_accession_and_location(accession, location, ext_flag):
             flash ("no individual associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/'+db+'/api/1.1/project/name/<accession>/sample/name/<sname>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/project/name/<accession>/sample/name/<sname>/<ext_flag>', methods=['GET'])
 def get_samples_by_sample_name_and_project(sname, accession, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]
@@ -2510,7 +2360,7 @@ def get_samples_by_sample_name_and_project(sname, accession, ext_flag):
             flash ("no project associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/'+db+'/api/1.1/project/name/<accession>/species/name/<sp_name>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/project/name/<accession>/species/name/<sp_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_project_accession_and_species(accession, sp_name, ext_flag):
     results=()
     curs = mysql.connection.cursor()
@@ -2535,7 +2385,7 @@ def get_individual_per_project_accession_and_species(accession, sp_name, ext_fla
             flash ("no project associated with the criteria provided")
             return redirect(url_for('index'))
 
-@app.route('/'+db+'/api/1.1/project/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/project/<ext_flag>', methods=['GET'])
 def get_projects(ext_flag):
     columns=get_columns_from_table('project')
     curs = mysql.connection.cursor()
@@ -2564,7 +2414,7 @@ def get_projects(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all projects', url_param=['project', 0, '/web'], results=results, plus=['',''], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/provider/<p_id>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/provider/<p_id>/<ext_flag>', methods=['GET'])
 def get_individual_by_provider(p_id, ext_flag):
     columns=get_columns_from_table('individual')
     curs = mysql.connection.cursor()
@@ -2588,7 +2438,7 @@ def get_individual_by_provider(p_id, ext_flag):
         session['criteria']="provider name (provider_id)= "+results[0][-1]+" ("+str(p_id)+")"
         return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
 
-@app.route('/'+db+'/api/1.1/provider/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/provider/<ext_flag>', methods=['GET'])
 def get_provider(ext_flag):
     pcolumns=get_columns_from_table('provider')
     columns=pcolumns[:2]+tuple([pcolumns[4]])+tuple(["species", 'individuals'])
@@ -2621,7 +2471,7 @@ def get_provider(ext_flag):
                 flash ("You need to be logged on to see contact details")
                 return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0, '/web' ], results=[columns,results], plus=['/'+db+'/api/1.1/provider/web','yes'], db=db, log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/provider/all/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/provider/all/<ext_flag>', methods=['GET'])
 def get_provider_all(ext_flag):
     pcolumns=get_columns_from_table('provider')
     columns=pcolumns+tuple(["individuals", 'species'])
@@ -2650,7 +2500,7 @@ def get_provider_all(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all providers', url_param=['provider', 0 , '/web'], results=[columns,results], plus=['/'+db+'/api/1.1/provider/web','no'], db=db, log=1, usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/sample/<s_id>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/sample/<s_id>/<ext_flag>', methods=['GET'])
 def get_sample_per_sample_id(s_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=['row_id', 'individual_id', 'name', 'alias', 'species_id', 'sex', 'location_id']
@@ -2727,7 +2577,7 @@ def get_sample_per_sample_id(s_id, ext_flag):
         for_display="sample name (sample_id)= "+", ".join(list_s_name)+" ("+s_id+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['sample',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/sample/'+s_id+'/all/web','yes'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='sample')
 
-@app.route('/'+db+'/api/1.1/sample/<s_id>/all/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/sample/<s_id>/all/<ext_flag>', methods=['GET'])
 def get_sample_per_sample_id_all(s_id, ext_flag):
     pcolumns=get_columns_from_table('project')
     icolumns=get_columns_from_table('individual')
@@ -2793,8 +2643,6 @@ def get_sample_per_sample_id_all(s_id, ext_flag):
         sample_results[sample_id]=table_dic
     curs.close()
     col_dic={'project':pcolumns, 'individual': icolumns, 'material': mcolumns, 'sample': scolumns, 'file': fcolumns}
-    sample_results, col_dic =add_individual_data_info(sample_results, col_dic, ext_flag)
-    sample_results, col_dic = add_annotations(sample_results, col_dic, ext_flag)
     json_results, web_results=generate_json_for_display(sample_results, col_dic, ext_flag, "sample")
     if ext_flag=='json':
         return jsonify(webresults_to_dic(json_results))
@@ -2802,7 +2650,7 @@ def get_sample_per_sample_id_all(s_id, ext_flag):
         for_display="sample name (sample_id)= "+", ".join(list_s_name)+" ("+s_id+")"
         return render_template("mysqltab.html", title='Query was: '+for_display, url_param=['sample',  0, '/web' ], results=web_results, plus=['/'+db+'/api/1.1/sample/'+s_id+'/web','no'],db=db, log=session['logged_in'], usrname=session.get('usrname', None), first_display='sample')
 
-@app.route('/'+db+'/api/1.1/sample/name/<sname>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/sample/name/<sname>/<ext_flag>', methods=['GET'])
 def get_samples_by_name(sname, ext_flag):
     s_list=sname.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
@@ -2828,7 +2676,7 @@ def get_samples_by_name(sname, ext_flag):
         else:
             return(redirect(url_for('get_sample_per_sample_id', s_id=list_sample_id, ext_flag=ext_flag)))
 
-@app.route('/'+db+'/api/1.1/sample/name/<sname>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/sample/name/<sname>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_samples_by_sample_name_and_individual_name(sname, ind_name, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     ind_list=ind_name.replace(" ","").replace(",", "','")
@@ -2857,7 +2705,7 @@ def get_samples_by_sample_name_and_individual_name(sname, ind_name, ext_flag):
         else:
             return(redirect(url_for('get_sample_per_sample_id', s_id=list_sample_id, ext_flag=ext_flag)))
 
-@app.route('/'+db+'/api/1.1/sample/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/sample/<ext_flag>', methods=['GET'])
 def get_samples(ext_flag):
     results=[]
     scolumns=get_columns_from_table('sample')
@@ -2900,9 +2748,9 @@ def get_samples(ext_flag):
             json_results=tuple_to_dic(tuple(new_columns[0]), display_results, "samples")
             return jsonify(webresults_to_dic(json_results))
         else:
-            return render_template("mysql.html", title='Query was: all samples', url_param=['sample', 0, '/web'], results=[new_columns[0],display_results], plus=['all/web','yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
+            return render_template("mysql.html", title='Query was: all samples', url_param=['sample', 0, '/web'], results=[new_columns[0],display_results], plus=['',''], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/species/<sp_id>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/species/<sp_id>/<ext_flag>', methods=['GET'])
 def get_species_per_species_id(sp_id, ext_flag):
     columns=get_columns_from_table('individual')[1:8]
     results=[]
@@ -2929,7 +2777,7 @@ def get_species_per_species_id(sp_id, ext_flag):
         session['criteria']="species name (species_id)= "+sresults[0][-1]+" ("+str(sp_id)+")"
         return redirect(url_for('get_individual_per_individual_id', i_id="("+list_individual_id+")", ext_flag=ext_flag))
 
-@app.route('/'+db+'/api/1.1/species/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/species/<ext_flag>', methods=['GET'])
 def get_species(ext_flag):
     scolumns=get_columns_from_table('species')
     columns=scolumns[1:6]+tuple([scolumns[9]])+tuple(["individuals"])
@@ -2960,7 +2808,7 @@ def get_species(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all species', url_param=['species',0, '/web'], results=[new_columns[0], display_results], plus=['all/web', 'yes'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/species/all/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/species/all/<ext_flag>', methods=['GET'])
 def get_species_all(ext_flag):
     scolumns=get_columns_from_table('species')
     columns=scolumns[1:]+tuple(["individuals"])
@@ -2993,7 +2841,7 @@ def get_species_all(ext_flag):
         else:
             return render_template("mysql.html", title='Query was: all species', url_param=['species',0, '/web'], results=[new_columns[0], display_results], plus=['/'+db+'/api/1.1/species/web','no'], db=db,  log=session['logged_in'], usrname=session.get('usrname', None))
 
-@app.route('/'+db+'/api/1.1/species/name/<sp_name>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/species/name/<sp_name>/<ext_flag>', methods=['GET'])
 def get_species_per_name(sp_name, ext_flag):
     list_species_id=""
     scolumns=get_columns_from_table('species')
@@ -3021,7 +2869,7 @@ def get_species_per_name(sp_name, ext_flag):
             flash ("no species associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/'+db+'/api/1.1/species/name/<sp_name>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/species/name/<sp_name>/individual/name/<ind_name>/<ext_flag>', methods=['GET'])
 def get_individual_per_name_and_species_name(ind_name, sp_name, ext_flag):
     ind_list=ind_name.replace(" ","").replace(",", "','")
     curs = mysql.connection.cursor()
@@ -3044,7 +2892,7 @@ def get_individual_per_name_and_species_name(ind_name, sp_name, ext_flag):
             flash ("no species associated with the name provided")
             return redirect(url_for('index'))
 
-@app.route('/'+db+'/api/1.1/species/name/<sp_name>/sample/name/<sname>/<ext_flag>', methods=['GET'])
+@app.route('/api/1.1/species/name/<sp_name>/sample/name/<sname>/<ext_flag>', methods=['GET'])
 def get_samples_by_sample_name_and_species(sname, sp_name, ext_flag):
     s_list="('"+sname.replace(" ","").replace(",", "','")+"')"
     results=[]

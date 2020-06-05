@@ -1,0 +1,95 @@
+{% include "base.html" %}
+
+{% block content %}
+
+<script src="https://code.jquery.com/jquery-3.3.1.js"></script>
+
+
+    <script type="text/javaScript">
+        $(function() {
+          $(".option-heading").on('click', function() {
+  $(this).toggleClass('is-active').next(".option-content").stop().slideToggle(500);
+});
+        });
+    </script>
+    <script type="text/javascript" src="/zxtm/piwik2.js"></script>
+
+    <style>
+    .option-heading:before           { content: "\25BA"; }
+    .option-heading.is-active:before { content: "\25BC"; }
+    /* Helpers */
+    .is-hidden { content: "\25BC"; display: none;
+    .btn {
+    display: inline-block;
+    margin: 0;
+    outline: 0 none;
+    padding: 0;
+    width: 0%;
+    box-sizing:border-box;
+}
+    </style>
+
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+<head>
+  <title>Welcome to the Durbin's group database</title>
+      <div  margin-left: 100px>
+        {% if log == 1 %}
+        <h3 style="text-align:right;font-size:100%;margin: 20px;"> logged in as
+          <a style="font-size:120%;">{{usrname}}</a>
+          <p></p>
+        {% endif %}
+      </h3>
+    </div>
+  </head>
+<body>
+  <p style="margin: 20px;">This website provides access to sample and sequencing information for the {{proj[0][0]}} project carried out in <a href="https://www.gen.cam.ac.uk/directory/richard-durbin">Richard Durbin</a>'s group with collaborators as listed below.
+  <br>{{proj[0][1]}}</p>
+        <p></p>
+    <fieldset>
+      <div class="option-heading" style="color:#007bff;"><b>Contact</b> information </div>
+      <div class="option-content is-hidden">
+        <p>To comment, add suggestions or report issues, please send an email by clicking <a style="text-align:center;color:#007bff;text-decoration:none;"href="mailto:had38@cam.ac.uk?Subject="+db+"%20website%20email">here</a></p>
+      </div>
+    </fieldset>
+    <p></p>
+    <fieldset>
+      <div class="option-heading" style="color:#007bff;"><b>Funding</b> information </div>
+      <div class="option-content is-hidden">
+      <p>{{proj[1]}}</p>
+    </div>
+    </fieldset>
+        <p></p>
+    <fieldset>
+      <div class="option-heading" style="color:#007bff;"><b>Collaboration</b> ongoing </div>
+      <div class="option-content is-hidden">
+      <p>{{proj[2]}}</p>
+    </fieldset>
+    <p></p>
+    <fieldset>
+      <div class="option-heading" style="color:#007bff;"><b>Publication</b> (latest) </div>
+      <div class="option-content is-hidden">
+        <p><a style="text-align:center;color:#007bff;text-decoration:none;" target="_blank" href={{proj[3][0][0]}}>{{proj[3][0][1]}}</a>
+        {% for entry in proj[3][1] %}
+          <br>{{entry}}
+        {% endfor %}
+        </p>
+      </div>
+    </fieldset>
+    <p></p>
+    <fieldset>
+      <div class="option-heading" style="color:#007bff;"><b>Resource</b> creator </div>
+      <div class="option-content is-hidden">
+        <br><a style="text-align:center;color:#007bff;text-decoration:none;"href="mailto:had38@cam.ac.uk?Subject=Cichlid%20website%20contact">Hubert DENISE (2019)</a>
+        <br>Department of Genetics, University of Cambridge
+        <br><span style='margin-left:10px'>with support from P. Albers, Y. Yehudi. J. Smith and M. Qureshi</span>
+      </div>
+    </fieldset>
+      </body>
+
+
+
+{% endblock %}
+{% extends "foot.html" %}

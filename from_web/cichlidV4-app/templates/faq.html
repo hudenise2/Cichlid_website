@@ -1,0 +1,114 @@
+{% include "base.html" %}
+
+{% block content %}
+
+<script src="https://code.jquery.com/jquery-3.3.1.js"></script>
+
+
+    <script type="text/javaScript">
+        $(function() {
+          $(".option-heading").on('click', function() {
+  $(this).toggleClass('is-active').next(".option-content").stop().slideToggle(500);
+});
+        });
+    </script>
+    <script type="text/javascript" src="/zxtm/piwik2.js"></script>
+    <style>
+    .option-heading:before           { content: "\25BA"; }
+    .option-heading.is-active:before { content: "\25BC"; }
+    /* Helpers */
+    .is-hidden { content: "\25BC"; display: none;
+    .btn {
+    display: inline-block;
+    margin: 0;
+    outline: 0 none;
+    padding: 0;
+    width: 0%;
+    box-sizing:border-box;
+}
+    </style>
+
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+<head>
+  <title>Welcome to the Durbin's group database</title>
+      <div  margin-left: 100px>
+        {% if log == 1 %}
+        <h3 style="text-align:right;font-size:100%;margin: 20px;"> logged in as
+          <a style="font-size:120%;">{{usrname}}</a>
+          <p></p>
+        {% endif %}
+      </h3>
+    </div>
+  </head>
+<body>
+  <p style="margin: 20px;">This website provides access to sample and sequencing information for the {{proj[0]}} project carried out in <a href="https://www.gen.cam.ac.uk/directory/richard-durbin">Richard Durbin</a>'s group.
+  <br>Below are answers to <b>Frequently Asked Questions</b>. If you cannot find the information you are looking for, send us an <a style="text-align:center;color:#007bff;text-decoration:none;"href="mailto:had38@cam.ac.uk?Subject=Cichlid%20website%20email">email</a></p>
+        <p></p>
+    <fieldset>
+      <div class="option-heading" style="color:#007bff;"><b>Which data can be accessed via this website?</b></div>
+      <div class="option-content is-hidden">
+        <p>This site provides access to metadata describing the collection, storage, processing and sequencing of samples.<p>Data corresponding to most tables in our database can be accessed using the '<b>Select a table</b>' button.<br>
+          Specific 'project', 'individual', 'material', 'sample' and 'file' data are available following the links in the displayed tables or using the <b>query form</b> available on the home page.<br>
+          Extra information will be displayed upon clicking on the '<span style="color:#007bff; font-size: 20px"><b>+</b></span>' sign displayd above the tables.<br>
+          Visibility of one or more columns can be toggled on, or off, using the '<b>add/remove columns</b>' button displayed above every table.</p>
+        </p>
+      </div>
+    </fieldset>
+    <p></p>
+    <fieldset>
+      <div class="option-heading" style="color:#007bff;"><b>Can I access the data programmatically?</b></div>
+      <div class="option-content is-hidden">
+        <p><b>Yes</b>.<br> The URL for the web page have three type of structure: <br><span style="margin-left: 25px;">- https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>{table}</b>/web  (for example: "<i>https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>project</b>/web</i>") <br>
+          <span style="margin-left: 25px;">- https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>{table}</b>/<b>{table_id}</b>/web  (for example: "<i>https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>project</b>/<b>1</b>/web</i>") <br>
+          <span style="margin-left: 25px;">- https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>{table}</b>/<span style="color:#007bff;"><b>name</b></span>/<b>{name}</b>/web  (for example: "<i>https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>individual</b>/<span style="color:#007bff;"><b>name</b></span>/<b>{{proj[1]}}</b>/web</i>") <br></span>
+        </p><p>The data can be accessed as a json format by replacing the suffix 'web' by '<b>json</b>'<br>
+          For example, using the second example above: "<i>curl https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>project</b>/<b>1</b>/json</i>" will display a json file with this structure:<br>
+            <span style="margin-left: 25px;"<b>(</b>"project:1": <br><span style="margin-left: 50px;"> project:[<br><span style="margin-left: 75px;">{<i>project_field1</i>: project_data1, <i>project_field2</i>: project_data2, .....}</span><br><span style="margin-left: 50px;"> ]</span></span><br>
+            <span style="margin-left: 50px;">material:[<br><span style="margin-left: 75px;">{<i>material_field1</i>: material1_data1, <i>material_field2</i>: material1_data2, .....}</span>,<br><span style="margin-left: 75px;">{<i>material_field1</i>: material2_data1, <i>material_field2</i>: material2_data2, .....},...</span><br><span style="margin-left: 50px;">]</span><br>
+            <span style="margin-left: 50px;">individual:[<br><span style="margin-left: 75px;">{<i>individual_field1</i>: individual1_data1, <i>individual_field2</i>: individual1_data2, .....}</span>,<br><span style="margin-left: 75px;">{<i>individual_field1</i>: individual2_data1, <i>individual_field2</i>: individual2_data2, .....},...<br><span style="margin-left: 50px;">]</span><br>
+            <span style="margin-left: 50px;">sample:[<br><span style="margin-left: 75px;">{<i>sample_field1</i>: sample1_data1, <i>sample_field2</i>: sample1_data2, .....}</span>,<br><span style="margin-left: 75px;">{<i>sample_field1</i>: sample2_data1, <i>sample_field2</i>: sample2_data2, .....},...<br><span style="margin-left: 50px;">]</span><br>
+            <span style="margin-left: 50px;">file:[<br><span style="margin-left: 75px;">{<i>file_field1</i>: file1_data1, <i>file_field2</i>: file1_data2, .....}</span>,<br><span style="margin-left: 75px;">{<i>file_field1</i>: file2_data1, <i>file_field2</i>: file2_data2, .....},...<br><span style="margin-left: 50px;">]</span><br><b><span style="margin-left: 25px;">)</span></b>
+            <br>Similarly, the call for the third example will be: "<i>curl https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>individual</b>/<span style="color:#007bff;"><b>name</b></span>/<b>{{proj[1]}}</b>/json</i>".<p>
+            - Several 'individual' and 'sample' names can be inserted: they need to be separated by a comma, or "%2C", with no space. No parenthesis or replace them with '%28' and '%29', respectively.<br>
+            - For 'species', 'provider', 'lane' and 'location': add the flag '-L' to instruct curl to follow the links (this flag can be added to all queries without adverse consequences). Example: "<i>curl -L https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>location</b>/<span style="color:#007bff;"><b>name</b></span>/<b>{{proj[2]}}</b>/json</i>". Spaces in the names have to be replaced by "%20".<br>
+            - Species queries accept partial name. For example: "<i>curl -L https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>species</b>/<span style="color:#007bff;"><b>name</b></span>/<b>Rhampho</b>/json</i>" will return the equivalent that "<i>curl -L https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>species</b>/<span style="color:#007bff;"><b>name</b></span>/<b>Rhamphochromis</b>/json</i>" would.<br>
+            - Note that the tag 'all' can be added to obtain more information, equivalent to the '<span style="color:#007bff;font-size: 20px"><b>+</b></span>' sign on the web pages, for tables 'individual', 'lane', 'material', 'species' and 'provider'. Example: "<i>curl -L https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/<b>species</b>/<span style="color:#007bff;"><b>all</b></span>/json</i>".<br>
+            - The tag 'all' can also be used in conjonction with '.../<b>project</b>/<b>{id}</b>/json', '.../<b>individual</b>/<b>{id}</b>/json', '.../<b>material</b>/<b>{id}</b>/json', '.../<b>file</b>/<b>{id}</b>/json' and '.../<b>sample</b>/<b>{id}</b>/json.'
+          </p>
+      </div>
+    </fieldset>
+        <p></p>
+    <fieldset>
+      <div class="option-heading" style="color:#007bff;"><b>How can I filter the display?</b></div>
+      <div class="option-content is-hidden">
+      <p>In addition to the text boxes available on the home page, a '<b>Search</b>' box is available on every tab displayed.<br>
+      The search will take place in all columns of the displayed table. The term(s) provided will be matched partially.</p>
+    </fieldset>
+    <p></p>
+    <fieldset>
+      <div class="option-heading" style="color:#007bff;"><b>How can I download the data from the website?</b></div>
+      <div class="option-content is-hidden">
+        <p>The data from the tables displayed on each page can be downloaded in 'tsv' (tab-separated format), excel and pdf format using the button displayed above the tables.<br>
+          Note that the downloaded pages will reflect the filtering applied via the '<b>Search</b>' box but not the '<b>add/remove columns</b>' button.<br>
+          Data can also be accessed programmatically. See the <a href="https://darwin-tracking.sanger.ac.uk/{{db}}/api/1.1/faq">FAQ</a> page for details.
+        </p>
+      </div>
+    </fieldset>
+    <p></p>
+    <fieldset>
+      <div class="option-heading" style="color:#007bff;"><b>How can I add new data to the database?</b></div>
+      <div class="option-content is-hidden">
+        <p>In order to add data to the database, you first need to be logged in. For that click on the '<a href="https://darwin-tracking.sanger.ac.uk/login"><b>Login</b></a>' button located on the top-right side of the page.<br>
+          Then you will be able to download a <b>template</b>, in tab-separated format, or fill a provided <b>form</b>.<br>
+          After uploading the filled <b>template</b> or submitting the completed <b>form</b>, we will review the data before adding them to the database in a timely manner.<br>
+          We recommand to upload a tab-separated file but other field separators are accepted as long as they are not present in the values provided.<br>
+          <b>Note</b>: the header line present in the template has to be present in the uploaded file.
+        </p>
+      </div>
+    </fieldset>
+      </body>
+{% endblock %}
+{% extends "foot.html" %}

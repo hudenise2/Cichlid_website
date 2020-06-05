@@ -99,6 +99,7 @@
         dom: 'Bfrtip',
         'sScrollY': '400px',
         'sScrollX': '100%',
+        "order": [[3, 'desc']],
         buttons: [
           {extend: 'colvis', postfixButtons: ['colvisRestore'], text: 'add/remove columns'},
           {extend: 'csvHtml5', text: 'Save all page(s) (TSV)',
@@ -118,7 +119,7 @@
           "targets": 0,
           "render": function( data, type, row ) {
             if ('{{url_param[0]}}' != 'nolink') {
-		    data2 = '<a href="/{{db}}/api/1.1/'+'{{ url_param[0] }}/'+ row[{{ url_param[1] }}]+ '{{ url_param[2] }}">' + data+ '</a>';
+              data2 = '<a href="/api/1.1/'+'{{ url_param[0] }}/'+ row[{{ url_param[1] }}]+ '{{ url_param[2] }}">' + data+ '</a>';
             } else {
               data2 = data;
             }
