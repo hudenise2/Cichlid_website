@@ -1,14 +1,14 @@
 {
   "MySQL_host": "localhost",
-  "MySQL_pswd": "xxxxxxx",
+  "MySQL_pswd": "m3ridian19My",
   "MySQL_usr": "root",
-  "MySQL_db": "CICHLID_TRACKINGV4",
-  "Mail_server": "xxxxxxxx",
+  "MySQL_db": "CICHLID_TRACKINGV2",
+  "Mail_server": "smtp.hermes.cam.ac.uk",
   "Mail_port": "465",
-  "Mail_usrn": "xxxx@xxxxxx",
-  "Mail_pswd" : "xxxxxxxxxxx",
+  "Mail_usrn": "had38@cam.ac.uk",
+  "Mail_pswd" : "m3ridian18Ge",
   "Mail_SSL" :  "True",
   "Mail_TLS" : "False",
-  "OUTPATH": "xxxxxxxxxx/UPLOAD/",
-  "TMPPATH": "xxxxxxxxxx/TMP/"
+  "OUTPATH": "/Users/hd/Documents/Cichlid_website_git/UPLOAD/",
+  "TMPPATH": "/Users/hd/Documents/Cichlid_website_git/TMP/"
 }
